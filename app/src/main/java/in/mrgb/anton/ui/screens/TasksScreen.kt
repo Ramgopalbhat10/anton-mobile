@@ -14,11 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
@@ -169,7 +171,7 @@ fun Fab(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 fun BottomBar(selected: Int, onNav: (Int) -> Unit) {
     val items = listOf(
-        Triple("Tasks", Icons.Outlined.FormatListBulleted, 0),
+        Triple("Tasks", Icons.Outlined.CheckCircle, 0),
         Triple("Projects", Icons.Outlined.Folder, 1),
         Triple("Activity", Icons.Outlined.History, 2),
         Triple("Settings", Icons.Outlined.Settings, 3),

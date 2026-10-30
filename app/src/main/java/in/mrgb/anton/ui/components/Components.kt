@@ -20,13 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Type
 
@@ -85,7 +88,11 @@ fun StateGlyph(kind: GlyphKind, size: Dp = 14.dp, live: Boolean = false) {
         when (kind) {
             GlyphKind.Working -> {
                 drawCircle(color.copy(alpha = 0.28f), r, c, style = Stroke(sw))
-                drawArc(color, spin, 90f, false, c - Offset(r, r), androidx.compose.ui.geometry.Size(r * 2, r * 2), false, Stroke(sw, cap = StrokeCap.Round))
+                drawArc(
+                    color = color, startAngle = spin, sweepAngle = 90f, useCenter = false,
+                    topLeft = c - Offset(r, r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                    style = Stroke(sw, cap = StrokeCap.Round),
+                )
                 drawCircle(color, 2.dp.toPx(), c)
             }
             GlyphKind.Waiting -> {

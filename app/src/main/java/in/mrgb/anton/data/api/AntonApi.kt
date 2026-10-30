@@ -83,10 +83,10 @@ class AntonApi(private val config: () -> ServerConfig) {
 
     suspend fun branches(projectId: String) = get<BranchesResponse>("/api/projects/$projectId/branches").branches
 
-    suspend fun createSession(input: CreateSessionRequest): SessionDto =
-        post("/api/sessions", json.encodeToString(CreateSessionRequest.serializer(), input)).let {
-            json.decodeFromString(json.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), it))
-        }
+    suspend fun createSession(input: CreateSessionRequest): SessionDto {
+        val body = post<JsonObject>("/api/sessions", json.encodeToString(CreateSessionRequest.serializer(), input))
+        return json.decodeFromJsonElement(SessionDto.serializer(), body["session"] ?: body)
+    }
 
     /**
      * Send a message to the task's agent. This endpoint keeps its budget checks
