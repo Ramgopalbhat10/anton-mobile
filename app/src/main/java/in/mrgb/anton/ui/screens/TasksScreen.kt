@@ -49,6 +49,7 @@ fun TasksScreen(
     onTab: (TasksTab) -> Unit,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
+    error: String? = null,
     tabIndex: Int = 0,
     onNav: (Int) -> Unit = {},
 ) {
@@ -71,6 +72,15 @@ fun TasksScreen(
                 )
             }
             val shown = sessions.filter { it.matches(tab) }
+            if (shown.isEmpty() && error != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(10.dp)).border(1.dp, Anton.Danger.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                        .background(Anton.DangerBg).padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text("Can't reach the server — check Settings → server + CF token", style = Type.Meta, color = Anton.DangerText)
+                }
+            }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 90.dp)) {
                 for (kind in groups) {
                     val rows = shown.filter { it.glyph() == kind }

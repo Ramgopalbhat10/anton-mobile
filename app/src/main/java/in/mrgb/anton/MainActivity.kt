@@ -8,9 +8,11 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -63,6 +65,8 @@ private fun App() {
         }
     }
 
+    // Pixel-class gesture nav + camera cutout: keep headers/FAB/tab bar inside the safe area.
+    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
     when (val s = screen) {
         is Screen.Tasks -> {
             val vm = tasksVm(app)
@@ -72,6 +76,7 @@ private fun App() {
                 onTab = vm::setTab,
                 onOpen = { screen = Screen.Thread(it) },
                 onNew = { newTask = true },
+                error = vm.error.collectAsState().value,
                 tabIndex = tabIndex, onNav = nav,
             )
         }
@@ -120,6 +125,7 @@ private fun App() {
                 tabIndex = tabIndex, onNav = nav,
             )
         }
+    }
     }
 
     if (newTask) {
