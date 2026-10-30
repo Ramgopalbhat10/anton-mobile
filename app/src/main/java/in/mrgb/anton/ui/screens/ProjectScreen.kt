@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import `in`.mrgb.anton.data.api.SpaceDetailDto
+import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
@@ -76,10 +76,9 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onOpen: (String) -> U
     }
 }
 
-/** A space's page: coordinator card, then threads in the same row anatomy as Tasks. */
+/** A space's page: coordinator card, then its threads in the same row anatomy as Tasks. */
 @Composable
-fun ProjectDetailScreen(detail: SpaceDetailDto?, onBack: () -> Unit, onOpenThread: (String) -> Unit) {
-    val space = detail?.space
+fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () -> Unit, onOpenThread: (String) -> Unit) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GhostIconButton(Icons.Outlined.ArrowBack, "Back", onBack)
@@ -99,14 +98,14 @@ fun ProjectDetailScreen(detail: SpaceDetailDto?, onBack: () -> Unit, onOpenThrea
                         }
                         Column(Modifier.weight(1f)) {
                             Text("Coordinator", style = Type.BodyMedium, color = Anton.TextPrimary)
-                            Text("Watching ${detail?.threads?.size ?: 0} threads", style = Type.Meta, color = Anton.TextTertiary)
+                            Text("Watching ${threads.size} threads", style = Type.Meta, color = Anton.TextTertiary)
                         }
                         Box(Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Anton.Accent))
                     }
                 }
             }
-            item { SectionLabel("Threads", detail?.threads?.size ?: 0) }
-            items(detail?.threads ?: emptyList(), key = { it.id }) { s -> TaskRow(s, onOpenThread) }
+            item { SectionLabel("Threads", threads.size) }
+            items(threads, key = { it.id }) { s -> TaskRow(s, onOpenThread) }
         }
     }
 }

@@ -104,7 +104,8 @@ private fun App() {
             val vm = projectsVm(app)
             LaunchedEffect(s.id) { vm.open(s.id) }
             ProjectDetailScreen(
-                detail = vm.detail.collectAsState().value,
+                space = vm.detail.collectAsState().value,
+                threads = vm.threads.collectAsState().value,
                 onBack = { screen = Screen.Projects },
                 onOpenThread = { screen = Screen.Thread(it) },
             )

@@ -113,7 +113,8 @@ data class SpaceDto(
     val goal: String = "",
     val state: String = "",
     val repoIds: List<String> = emptyList(),
-    val threads: List<SessionDto> = emptyList(),
+    // The list endpoint serves threads as a count; the detail endpoint carries the rows.
+    @SerialName("threads") val threadCount: Int = 0,
     val counts: Map<String, Int> = emptyMap(),
     val updatedAt: String = "",
 )
@@ -121,12 +122,8 @@ data class SpaceDto(
 @Serializable
 data class SpacesResponse(val spaces: List<SpaceDto> = emptyList())
 
-@Serializable
-data class SpaceDetailDto(
-    val id: String = "",
-    val space: SpaceDto = SpaceDto(id = ""),
-    val threads: List<SessionDto> = emptyList(),
-)
+/** /spaces/:id returns the space object itself; thread rows come from sessions filtered by spaceId. */
+typealias SpaceDetailDto = SpaceDto
 
 @Serializable
 data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null, val vendor: String? = null)

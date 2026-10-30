@@ -94,8 +94,10 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
 class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     private val _spaces = MutableStateFlow<List<SpaceDto>>(emptyList())
     val spaces = _spaces.asStateFlow()
-    private val _detail = MutableStateFlow<SpaceDetailDto?>(null)
+    private val _detail = MutableStateFlow<SpaceDto?>(null)
     val detail = _detail.asStateFlow()
+    private val _threads = MutableStateFlow<List<SessionDto>>(emptyList())
+    val threads = _threads.asStateFlow()
     val error = MutableStateFlow<String?>(null)
 
     init { refresh() }
@@ -108,6 +110,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
 
     fun open(id: String) = viewModelScope.launch {
         runCatching { repo.space(id) }.onSuccess { _detail.value = it }
+        runCatching { repo.sessions() }.onSuccess { list -> _threads.value = list.filter { it.spaceId == id } }
     }
 }
 

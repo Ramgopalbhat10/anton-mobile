@@ -42,8 +42,10 @@ class AntonApi(private val config: () -> ServerConfig) {
     /** Cloudflare Access service auth headers ride on every request, including SSE and uploads. */
     private fun Request.Builder.withAuth(): Request.Builder {
         val c = config()
-        if (c.cfClientId.isNotBlank()) header("CF-Access-Client-Id", c.cfClientId)
-        if (c.cfClientSecret.isNotBlank()) header("CF-Access-Client-Secret", c.cfClientSecret)
+        val id = c.cfClientId.trim()
+        val secret = c.cfClientSecret.trim()
+        if (id.isNotBlank()) header("CF-Access-Client-Id", id)
+        if (secret.isNotBlank()) header("CF-Access-Client-Secret", secret)
         header("Accept", "application/json")
         return this
     }
@@ -81,7 +83,7 @@ class AntonApi(private val config: () -> ServerConfig) {
 
     suspend fun spaces() = get<SpacesResponse>("/api/mobile/spaces").spaces
 
-    suspend fun space(id: String) = get<SpaceDetailDto>("/api/mobile/spaces/$id")
+    suspend fun space(id: String) = get<SpaceDto>("/api/mobile/spaces/$id")
 
     suspend fun models() = get<ModelsResponse>("/api/mobile/models")
 
