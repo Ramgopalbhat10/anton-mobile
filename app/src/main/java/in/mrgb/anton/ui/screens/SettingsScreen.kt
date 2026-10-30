@@ -45,11 +45,11 @@ fun SettingsScreen(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel("Server")
             AntonCard(Modifier.fillMaxWidth()) {
-                FieldRow("Server URL", baseUrl.ifBlank { "https://code.mrgb.in" }) { url -> onServer(url, cfId, cfSecret) }
+                FieldRow("Server URL", baseUrl, placeholder = "https://code.mrgb.in") { url -> onServer(url, cfId, cfSecret) }
                 Divider()
-                FieldRow("CF-Access-Client-Id", cfId.ifBlank { "cf_client_id_…" }) { v -> onServer(baseUrl, v, cfSecret) }
+                FieldRow("CF-Access-Client-Id", cfId, placeholder = "service-token client id") { v -> onServer(baseUrl, v, cfSecret) }
                 Divider()
-                FieldRow("CF-Access-Client-Secret", if (cfSecret.isBlank()) "" else "••••••••", secret = true) { v -> onServer(baseUrl, cfId, v) }
+                FieldRow("CF-Access-Client-Secret", cfSecret, secret = true) { v -> onServer(baseUrl, cfId, v) }
             }
             SectionLabel("Notify me")
             AntonCard(Modifier.fillMaxWidth()) {
@@ -77,7 +77,7 @@ fun SettingsScreen(
 private fun Divider() = Box(Modifier.fillMaxWidth().height(1.dp).background(Anton.BorderSubtle))
 
 @Composable
-private fun FieldRow(label: String, value: String, secret: Boolean = false, onValue: (String) -> Unit) {
+private fun FieldRow(label: String, value: String, placeholder: String = "", secret: Boolean = false, onValue: (String) -> Unit) {
     var editing = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(value) }
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -86,6 +86,9 @@ private fun FieldRow(label: String, value: String, secret: Boolean = false, onVa
                 value = editing.value,
                 onValueChange = { editing.value = it; onValue(it) },
                 singleLine = true,
+                placeholder = { Text(placeholder, style = Type.Num, color = Anton.TextDisabled) },
+                visualTransformation = if (secret) androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    else androidx.compose.ui.text.input.VisualTransformation.None,
                 textStyle = Type.Num.copy(color = Anton.TextSecondary),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Anton.Accent, unfocusedBorderColor = Anton.BorderSubtle,

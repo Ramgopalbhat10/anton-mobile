@@ -31,7 +31,7 @@ class SettingsStore(private val context: Context) {
 
     val config: Flow<ServerConfig> = context.store.data.map {
         ServerConfig(
-            baseUrl = it[K.BASE_URL] ?: "",
+            baseUrl = it[K.BASE_URL] ?: "https://code.mrgb.in",
             cfClientId = it[K.CF_ID] ?: "",
             cfClientSecret = it[K.CF_SECRET] ?: "",
         )

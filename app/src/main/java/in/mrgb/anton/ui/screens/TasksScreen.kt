@@ -78,7 +78,10 @@ fun TasksScreen(
                         .clip(RoundedCornerShape(10.dp)).border(1.dp, Anton.Danger.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                         .background(Anton.DangerBg).padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    Text("Can't reach the server — check Settings → server + CF token", style = Type.Meta, color = Anton.DangerText)
+                    Text(
+                        "Can't reach the server — ${error.take(80)}",
+                        style = Type.Meta, color = Anton.DangerText, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 90.dp)) {
