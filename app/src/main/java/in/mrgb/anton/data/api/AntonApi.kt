@@ -18,7 +18,13 @@ data class ServerConfig(
     val cfClientId: String = "",
     val cfClientSecret: String = "",
 ) {
-    val normalized: String get() = baseUrl.trim().removeSuffix("/")
+    val normalized: String
+        get() {
+            var u = baseUrl.trim().removeSuffix("/")
+            if (u.isBlank()) u = "https://code.mrgb.in"
+            if (!u.startsWith("http")) u = "https://$u"
+            return u
+        }
 }
 
 class AntonApi(private val config: () -> ServerConfig) {
