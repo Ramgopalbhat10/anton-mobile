@@ -15,6 +15,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        ndk { abiFilters += "arm64-v8a" }
+        resourceConfigurations += "en"
     }
 
     buildTypes {
@@ -65,6 +68,5 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.coil.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
