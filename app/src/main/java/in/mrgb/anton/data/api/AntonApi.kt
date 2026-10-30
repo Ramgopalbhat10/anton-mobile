@@ -98,15 +98,44 @@ class AntonApi(private val config: () -> ServerConfig) {
      * Send a message to the task's agent. This endpoint keeps its budget checks
      * and priming — the mobile facade deliberately doesn't re-implement them.
      */
+    /** flue's admission shape: POST {kind:"user", body:text} → 202. */
     suspend fun sendMessage(sessionId: String, text: String) =
-        post<JsonObject>("/api/agents/coder/$sessionId", json.encodeToString(AgentMessageRequest.serializer(), AgentMessageRequest(text)))
+        post<JsonObject>(
+            "/api/agents/coder/$sessionId",
+            kotlinx.serialization.json.buildJsonObject {
+                put("kind", kotlinx.serialization.json.JsonPrimitive("user"))
+                put("body", kotlinx.serialization.json.JsonPrimitive(text))
+            }.toString(),
+        )
+
+    /** What the web's composer Stop calls: stops the reply, keeps the sandbox. */
+    suspend fun abortSession(id: String) = post<JsonObject>("/api/agents/coder/$id/abort")
 
     suspend fun stopSession(id: String) = post<JsonObject>("/api/sessions/$id/stop")
 
     suspend fun resumeSession(id: String) = post<JsonObject>("/api/sessions/$id/resume")
 
-    suspend fun resolveSession(id: String, resolved: Boolean) =
-        post<JsonObject>("/api/sessions/$id", "") // PATCH-equivalent handled below
+    suspend fun updateSession(id: String, model: String? = null, resolved: Boolean? = null): SessionDto =
+        withContext(Dispatchers.IO) {
+            val bodyJson = kotlinx.serialization.json.buildJsonObject {
+                model?.let { put("model", kotlinx.serialization.json.JsonPrimitive(it)) }
+                resolved?.let { put("resolved", kotlinx.serialization.json.JsonPrimitive(it)) }
+            }.toString()
+            val req = Request.Builder().url(url("/api/sessions/$id")).withAuth()
+                .patch(bodyJson.toRequestBody("application/json".toMediaType())).build()
+            http.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (!res.isSuccessful) throw ApiError(res.code, text)
+                json.decodeFromString<SessionDto>(text.ifBlank { "{}" }.let { if (it == "{}") "{\"id\":\"$id\"}" else it })
+            }
+        }
+
+    suspend fun deleteSession(id: String) = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url("/api/sessions/$id")).withAuth().delete().build()
+        http.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) throw ApiError(res.code, res.body?.string().orEmpty())
+        }
+    }
 
     suspend fun uploadAttachment(sessionId: String, name: String, file: File, mime: String): JsonObject =
         withContext(Dispatchers.IO) {

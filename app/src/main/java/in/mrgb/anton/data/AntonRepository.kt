@@ -36,7 +36,13 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun send(id: String, text: String) = api.sendMessage(id, text)
 
+    suspend fun abort(id: String) = api.abortSession(id)
+
     suspend fun stop(id: String) = api.stopSession(id)
 
     suspend fun resume(id: String) = api.resumeSession(id)
+
+    suspend fun setModel(id: String, model: String) = api.updateSession(id, model = model)
+
+    suspend fun models() = api.models()
 }

@@ -5,13 +5,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
@@ -40,19 +43,25 @@ private fun SessionDto.matches(tab: TasksTab) = when (tab) {
     TasksTab.Done -> glyph() == GlyphKind.Resolved
 }
 
+private fun SessionDto.matchesQuery(q: String) =
+    q.isBlank() || title.contains(q, ignoreCase = true) || repo.contains(q, ignoreCase = true)
+
 private val groups = listOf(GlyphKind.Failed, GlyphKind.Waiting, GlyphKind.Working, GlyphKind.Queued, GlyphKind.Review, GlyphKind.Landing, GlyphKind.Idle, GlyphKind.Resolved)
 
 @Composable
 fun TasksScreen(
     sessions: List<SessionDto>,
     tab: TasksTab,
+    query: String,
     onTab: (TasksTab) -> Unit,
+    onQuery: (String) -> Unit,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     error: String? = null,
     tabIndex: Int = 0,
     onNav: (Int) -> Unit = {},
 ) {
+    var searching by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -60,8 +69,31 @@ fun TasksScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Tasks", style = Type.Title, color = Anton.TextPrimary, modifier = Modifier.weight(1f))
-                GhostIconButton(Icons.Outlined.Search, "Search")
+                GhostIconButton(Icons.Outlined.Search, "Search") { searching = !searching; if (!searching) onQuery("") }
                 GhostIconButton(Icons.Outlined.Add, "New task", onNew)
+            }
+            if (searching) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 6.dp)
+                        .clip(RoundedCornerShape(9.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp))
+                        .background(Anton.WellBg).padding(horizontal = 11.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.Search, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
+                    BasicTextField(
+                        value = query, onValueChange = onQuery,
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = Type.Body.copy(color = Anton.TextPrimary),
+                        cursorBrush = SolidColor(Anton.Accent),
+                        decorationBox = { inner ->
+                            if (query.isBlank()) Text("Search tasks…", style = Type.Body, color = Anton.TextTertiary)
+                            inner()
+                        },
+                    )
+                    if (query.isNotEmpty()) GhostIconButton(Icons.Outlined.Close, "Clear") { onQuery("") }
+                }
             }
             Box(Modifier.padding(horizontal = 14.dp, vertical = 2.dp)) {
                 Segmented(
@@ -71,8 +103,8 @@ fun TasksScreen(
                     counts = TasksTab.entries.associateWith { t -> sessions.count { s -> s.matches(t) } },
                 )
             }
-            val shown = sessions.filter { it.matches(tab) }
-            if (shown.isEmpty() && error != null) {
+            val shown = sessions.filter { it.matches(tab) && it.matchesQuery(query) }
+            if (sessions.isEmpty() && error != null) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
                         .clip(RoundedCornerShape(10.dp)).border(1.dp, Anton.Danger.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
@@ -98,7 +130,7 @@ fun TasksScreen(
     }
 }
 
-/** Mirrors src/web/components/task-row.tsx: glyph + title + PR + age; facts + cost below. */
+/** Mirrors src/web/components/task-row.tsx: glyph + title + PR + age; one facts line + cost below. */
 @Composable
 fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
     Column(
@@ -136,17 +168,19 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
             Text(ageOf(s.createdAt), style = Type.Num, color = Anton.TextDisabled)
         }
         Row(
-            Modifier.padding(top = 2.dp),
+            Modifier.padding(top = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Fact(Icons.Outlined.Folder, s.repo.ifBlank { "Chat" })
-            if (s.branch.isNotBlank()) Fact(Icons.Outlined.AccountTree, s.branch, mono = true)
-            if (s.model.isNotBlank()) Fact(null, s.model.substringAfterLast('/'))
-            s.errorMessage?.let {
-                Text(it, style = Type.Meta, color = Anton.DangerText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            // Left group is weight-bounded so a long repo ellipsizes instead of pushing cost off-screen.
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Fact(Icons.Outlined.Folder, s.repo.ifBlank { "Chat" })
+                if (s.branch.isNotBlank()) Fact(Icons.Outlined.AccountTree, s.branch, mono = true)
+                if (s.model.isNotBlank()) Fact(null, s.model.substringAfterLast('/'))
+                s.errorMessage?.let {
+                    Text(it, style = Type.Meta, color = Anton.DangerText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                }
             }
-            Spacer(Modifier.weight(1f))
             val tok = s.usage.inputTokens + s.usage.outputTokens
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("$${"%.2f".format(s.usage.cost)}", style = Type.Num, color = Anton.TextSecondary)

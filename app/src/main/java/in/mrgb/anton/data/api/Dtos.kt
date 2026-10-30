@@ -109,9 +109,13 @@ data class MessagesResponse(val messages: List<MessageDto> = emptyList())
 data class SpaceDto(
     val id: String,
     val name: String = "",
+    val icon: String = "",
+    val goal: String = "",
+    val state: String = "",
     val repoIds: List<String> = emptyList(),
     val threads: List<SessionDto> = emptyList(),
     val counts: Map<String, Int> = emptyMap(),
+    val updatedAt: String = "",
 )
 
 @Serializable
@@ -125,7 +129,7 @@ data class SpaceDetailDto(
 )
 
 @Serializable
-data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null)
+data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null, val vendor: String? = null)
 
 @Serializable
 data class ModelsResponse(
@@ -146,7 +150,7 @@ data class BranchesResponse(val branches: List<String> = emptyList())
 @Serializable
 data class CreateSessionRequest(
     val projectId: String? = null,
-    val prompt: String,
+    val titleFrom: String? = null,
     val model: String? = null,
     val branch: String? = null,
     val planMode: Boolean = true,

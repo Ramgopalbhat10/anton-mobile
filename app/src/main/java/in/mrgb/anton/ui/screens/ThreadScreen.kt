@@ -12,8 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -24,7 +27,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 import `in`.mrgb.anton.data.api.MessageDto
+import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.ui.components.*
@@ -35,12 +42,19 @@ import `in`.mrgb.anton.ui.theme.Type
 fun ThreadScreen(
     bundle: SessionBundleDto?,
     messages: List<MessageDto>,
+    models: List<ModelDto>,
     sending: Boolean,
+    webUrl: String,
     onBack: () -> Unit,
     onSend: (String) -> Unit,
+    onAbort: () -> Unit,
     onStop: () -> Unit,
+    onModel: (String) -> Unit,
+    onLoadModels: () -> Unit,
 ) {
     val s = bundle?.session
+    var menu by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(
             Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 8.dp, vertical = 8.dp),
@@ -55,7 +69,37 @@ fun ThreadScreen(
                 Text(it.glyph().label, style = Type.Meta, color = Anton.TextTertiary)
             }
             Spacer(Modifier.weight(1f))
-            GhostIconButton(Icons.Outlined.MoreVert, "More")
+            Box {
+                GhostIconButton(Icons.Outlined.MoreVert, "More") { menu = true }
+                DropdownMenu(
+                    expanded = menu, onDismissRequest = { menu = false },
+                    modifier = Modifier.background(Anton.Raised).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Open in web", style = Type.Body, color = Anton.TextPrimary) },
+                        onClick = {
+                            menu = false
+                            ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(webUrl)))
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Copy link", style = Type.Body, color = Anton.TextPrimary) },
+                        onClick = {
+                            menu = false
+                            val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("task", webUrl))
+                        },
+                    )
+                    if (s?.working == true) DropdownMenuItem(
+                        text = { Text("Stop replying", style = Type.Body, color = Anton.DangerText) },
+                        onClick = { menu = false; onAbort() },
+                    )
+                    if (s?.working != true && s?.status != "stopped") DropdownMenuItem(
+                        text = { Text("Stop task", style = Type.Body, color = Anton.DangerText) },
+                        onClick = { menu = false; onStop() },
+                    )
+                }
+            }
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
@@ -68,9 +112,45 @@ fun ThreadScreen(
                 item { TraceRow("Working on your reply…", live = true) }
             }
         }
-        Composer(working = s?.working == true, sending = sending, onSend = onSend, onStop = onStop, model = s?.model?.substringAfterLast('/') ?: "")
+        Composer(
+            working = s?.working == true,
+            sending = sending,
+            onSend = onSend,
+            onStop = onAbort,
+            model = s?.model?.substringAfterLast('/') ?: "",
+            models = models,
+            onModel = onModel,
+            onLoadModels = onLoadModels,
+        )
     }
 }
+
+@Composable
+private fun mdColors() = markdownColor(
+    text = Anton.TextPrimary,
+    codeText = Anton.TextPrimary,
+    codeBackground = Anton.WellBg,
+    dividerColor = Anton.BorderDefault,
+    linkText = Anton.Accent,
+)
+
+@Composable
+private fun mdType() = markdownTypography(
+    text = Type.Body.copy(lineHeight = 19.sp),
+    h1 = Type.Title.copy(fontSize = 15.sp),
+    h2 = Type.BodyMedium.copy(fontSize = 14.sp),
+    h3 = Type.BodyMedium,
+    h4 = Type.BodyMedium,
+    h5 = Type.BodyMedium,
+    h6 = Type.BodyMedium,
+    code = Type.Num.copy(lineHeight = 18.sp),
+    list = Type.Body.copy(lineHeight = 19.sp),
+    bullet = Type.Body,
+    quote = Type.Body.copy(lineHeight = 19.sp),
+    paragraph = Type.Body.copy(lineHeight = 19.sp),
+    link = Type.Body.copy(lineHeight = 19.sp, color = Anton.Accent),
+    ordered = Type.Body.copy(lineHeight = 19.sp),
+)
 
 @Composable
 private fun UserMessage(m: MessageDto) {
@@ -85,7 +165,6 @@ private fun UserMessage(m: MessageDto) {
         ) {
             Text(m.parts.firstOrNull { it.type == "text" }?.text.orEmpty(), style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
         }
-        m.at?.let { Text("", style = Type.MonoLabel.copy(fontSize = 10.5.sp), color = Anton.TextDisabled, modifier = Modifier.padding(top = 4.dp)) }
     }
 }
 
@@ -99,12 +178,48 @@ private fun AgentMessage(m: MessageDto) {
 @Composable
 private fun PartView(p: PartDto) {
     when (p.type) {
-        "text" -> Text(p.text.orEmpty(), style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
-        "reasoning" -> TraceRow(p.text?.take(90).orEmpty(), live = false)
+        "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
+        "reasoning" -> ReasoningPart(p.text.orEmpty())
         "tool" -> TraceRow(p.title ?: p.name ?: "Tool", detail = p.state?.take(24))
         "file" -> p.path?.let { FileChip(it) }
         "ask" -> AskCard(p)
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
+    }
+}
+
+/** Reasoning collapses to a trace row; tap to expand the full thought. */
+@Composable
+private fun ReasoningPart(text: String) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }) {
+        Row(
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.width(3.dp).height(12.dp).clip(RoundedCornerShape(1.5.dp)).background(Anton.N600))
+            Text(
+                if (open) "Reasoning" else text.take(90),
+                style = Type.Small, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(Icons.Outlined.KeyboardArrowDown, if (open) "Collapse" else "Expand", tint = Anton.IconDisabled, modifier = Modifier.size(13.dp))
+        }
+        if (open) {
+            Box(Modifier.padding(start = 11.dp, top = 2.dp, bottom = 2.dp).border(0.dp, Anton.N600).padding(start = 8.dp)) {
+                Markdown(
+                    text,
+                    colors = mdColors().let { c -> markdownColor(text = Anton.TextSecondary, codeText = c.codeText, codeBackground = c.codeBackground, dividerColor = c.dividerColor, linkText = c.linkText) },
+                    typography = markdownTypography(
+                        text = Type.Small.copy(lineHeight = 17.sp), paragraph = Type.Small.copy(lineHeight = 17.sp),
+                        list = Type.Small.copy(lineHeight = 17.sp), bullet = Type.Small, ordered = Type.Small.copy(lineHeight = 17.sp),
+                        code = Type.Num, quote = Type.Small.copy(lineHeight = 17.sp),
+                        h1 = Type.BodyMedium, h2 = Type.BodyMedium, h3 = Type.Small, h4 = Type.Small, h5 = Type.Small, h6 = Type.Small,
+                        link = Type.Small.copy(color = Anton.Accent),
+                    ),
+                )
+            }
+        }
     }
 }
 
@@ -157,8 +272,13 @@ private fun QueuedNote(text: String) {
 }
 
 @Composable
-private fun Composer(working: Boolean, sending: Boolean, onSend: (String) -> Unit, onStop: () -> Unit, model: String) {
+private fun Composer(
+    working: Boolean, sending: Boolean,
+    onSend: (String) -> Unit, onStop: () -> Unit,
+    model: String, models: List<ModelDto>, onModel: (String) -> Unit, onLoadModels: () -> Unit,
+) {
     var text by remember { mutableStateOf("") }
+    var modelMenu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 12.dp).padding(top = 8.dp, bottom = 12.dp)) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp)).background(Anton.CardBg)) {
             BasicTextField(
@@ -177,10 +297,35 @@ private fun Composer(working: Boolean, sending: Boolean, onSend: (String) -> Uni
             Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 GhostIconButton(Icons.Outlined.AttachFile, "Attach")
                 if (model.isNotBlank()) {
-                    Row(
-                        Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) { Text(model, style = Type.Meta, color = Anton.TextSecondary) }
+                    Box {
+                        Row(
+                            Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(6.dp))
+                                .clickable { onLoadModels(); modelMenu = true }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(model, style = Type.Meta, color = Anton.TextSecondary)
+                            Icon(Icons.Outlined.KeyboardArrowDown, "Model", tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
+                        }
+                        DropdownMenu(
+                            expanded = modelMenu, onDismissRequest = { modelMenu = false },
+                            modifier = Modifier.background(Anton.Raised).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 320.dp),
+                        ) {
+                            models.forEach { m ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(m.name.ifBlank { m.id }, style = Type.Body, color = Anton.TextPrimary)
+                                            Text(m.id.substringAfterLast('/'), style = Type.Meta, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    },
+                                    onClick = { modelMenu = false; onModel(m.id) },
+                                )
+                            }
+                            if (models.isEmpty()) DropdownMenuItem(text = { Text("Loading models…", style = Type.Body, color = Anton.TextTertiary) }, onClick = {})
+                        }
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 Box(

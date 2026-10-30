@@ -14,6 +14,8 @@ class TasksViewModel(private val repo: AntonRepository) : ViewModel() {
     val sessions = _sessions.asStateFlow()
     private val _tab = MutableStateFlow(TasksTab.All)
     val tab = _tab.asStateFlow()
+    private val _query = MutableStateFlow("")
+    val query = _query.asStateFlow()
     val error = MutableStateFlow<String?>(null)
 
     init {
@@ -31,6 +33,7 @@ class TasksViewModel(private val repo: AntonRepository) : ViewModel() {
     }
 
     fun setTab(t: TasksTab) { _tab.value = t }
+    fun setQuery(q: String) { _query.value = q }
 }
 
 class ThreadViewModel(private val repo: AntonRepository, private val sessionId: String) : ViewModel() {
@@ -38,6 +41,8 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val bundle = _bundle.asStateFlow()
     private val _messages = MutableStateFlow<List<MessageDto>>(emptyList())
     val messages = _messages.asStateFlow()
+    private val _models = MutableStateFlow<List<ModelDto>>(emptyList())
+    val models = _models.asStateFlow()
     val sending = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
 
@@ -56,6 +61,11 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         runCatching { repo.messages(sessionId) }.onSuccess { _messages.value = it }
     }
 
+    fun loadModels() = viewModelScope.launch {
+        if (_models.value.isNotEmpty()) return@launch
+        runCatching { repo.models() }.onSuccess { r -> _models.value = r.models }
+    }
+
     fun send(text: String) = viewModelScope.launch {
         sending.value = true
         runCatching { repo.send(sessionId, text) }
@@ -64,9 +74,20 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         refresh()
     }
 
+    fun abort() = viewModelScope.launch {
+        runCatching { repo.abort(sessionId) }.onFailure { error.value = it.message }
+        refresh()
+    }
+
     fun stop() = viewModelScope.launch {
         runCatching { repo.stop(sessionId) }.onFailure { error.value = it.message }
         refresh()
+    }
+
+    fun setModel(model: String) = viewModelScope.launch {
+        runCatching { repo.setModel(sessionId, model) }
+            .onSuccess { _bundle.value = _bundle.value?.copy(session = it) }
+            .onFailure { error.value = it.message }
     }
 }
 
@@ -75,11 +96,14 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     val spaces = _spaces.asStateFlow()
     private val _detail = MutableStateFlow<SpaceDetailDto?>(null)
     val detail = _detail.asStateFlow()
+    val error = MutableStateFlow<String?>(null)
 
     init { refresh() }
 
     fun refresh() = viewModelScope.launch {
-        runCatching { repo.spaces() }.onSuccess { _spaces.value = it }
+        runCatching { repo.spaces() }
+            .onSuccess { _spaces.value = it }
+            .onFailure { error.value = it.message }
     }
 
     fun open(id: String) = viewModelScope.launch {
@@ -107,6 +131,7 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     val models = MutableStateFlow<List<String>>(emptyList())
     val creating = MutableStateFlow(false)
     val planFirst = store.planFirst.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val error = MutableStateFlow<String?>(null)
 
     init {
         viewModelScope.launch {
@@ -114,7 +139,7 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
                 repos.value = list.map { it.id to it.fullName.ifBlank { it.name } }
             }
             runCatching { repo.api.models() }.onSuccess { r ->
-                models.value = (r.pinned.ifEmpty { r.models.map { it.id } }).take(3)
+                models.value = (r.pinned.ifEmpty { r.models.map { it.id } }).take(4)
             }
         }
     }
@@ -123,11 +148,18 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
 
     fun start(projectId: String?, prompt: String, model: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
         creating.value = true
-        val id = runCatching {
+        error.value = null
+        val created = runCatching {
             repo.api.createSession(
-                CreateSessionRequest(projectId = projectId, prompt = prompt, model = model, planMode = planFirst.value)
-            ).id
-        }.getOrNull()
+                CreateSessionRequest(projectId = projectId, titleFrom = prompt.take(200), model = model, planMode = planFirst.value)
+            )
+        }
+        val id = created.getOrNull()?.id
+        if (id == null) {
+            error.value = created.exceptionOrNull()?.message
+        } else {
+            runCatching { repo.send(id, prompt) }.onFailure { error.value = it.message }
+        }
         creating.value = false
         onDone(id)
     }

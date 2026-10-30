@@ -9,19 +9,28 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import `in`.mrgb.anton.ui.components.SectionLabel
 import `in`.mrgb.anton.ui.screens.*
+import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.AntonTheme
+import `in`.mrgb.anton.ui.theme.Type
 import `in`.mrgb.anton.vm.*
 
 /** Flat in-app navigation — this app is a list and a thread, not a stack. */
@@ -60,7 +69,7 @@ private fun App() {
         screen = when (it) {
             0 -> Screen.Tasks
             1 -> Screen.Projects
-            2 -> Screen.Activity // placeholder — same list shape, filtered to recent events
+            2 -> Screen.Activity
             else -> Screen.Settings
         }
     }
@@ -73,7 +82,9 @@ private fun App() {
             TasksScreen(
                 sessions = vm.sessions.collectAsState().value,
                 tab = vm.tab.collectAsState().value,
+                query = vm.query.collectAsState().value,
                 onTab = vm::setTab,
+                onQuery = vm::setQuery,
                 onOpen = { screen = Screen.Thread(it) },
                 onNew = { newTask = true },
                 error = vm.error.collectAsState().value,
@@ -84,6 +95,7 @@ private fun App() {
             val vm = projectsVm(app)
             ProjectsScreen(
                 spaces = vm.spaces.collectAsState().value,
+                error = vm.error.collectAsState().value,
                 onOpen = { screen = Screen.Project(it) },
                 tabIndex = tabIndex, onNav = nav,
             )
@@ -99,16 +111,29 @@ private fun App() {
         }
         is Screen.Thread -> {
             val vm = threadVm(app, s.id)
+            val cfg = app.store.config.collectAsState(initial = null).value
             ThreadScreen(
                 bundle = vm.bundle.collectAsState().value,
                 messages = vm.messages.collectAsState().value,
+                models = vm.models.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
+                webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 onBack = { screen = Screen.Tasks },
                 onSend = vm::send,
+                onAbort = vm::abort,
                 onStop = vm::stop,
+                onModel = vm::setModel,
+                onLoadModels = vm::loadModels,
             )
         }
-        is Screen.Activity -> ActivityScreen(tabIndex, nav)
+        is Screen.Activity -> {
+            val vm = tasksVm(app)
+            ActivityScreen(
+                sessions = vm.sessions.collectAsState().value,
+                onOpen = { screen = Screen.Thread(it) },
+                tabIndex = tabIndex, onNav = nav,
+            )
+        }
         is Screen.Settings -> {
             val vm = settingsVm(app)
             val cfg = vm.config.collectAsState().value
@@ -133,7 +158,7 @@ private fun App() {
         ModalBottomSheet(
             onDismissRequest = { newTask = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = `in`.mrgb.anton.ui.theme.Anton.Raised,
+            containerColor = Anton.Raised,
         ) {
             NewTaskSheet(
                 repos = vm.repos.collectAsState().value,
@@ -153,17 +178,24 @@ private fun App() {
     }
 }
 
-/** Placeholder for the Activity tab until the events feed lands — keeps the bar's shape. */
+/** Activity: every session, most recently touched first — same row anatomy as Tasks. */
 @Composable
-private fun ActivityScreen(tabIndex: Int, onNav: (Int) -> Unit) {
-    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(`in`.mrgb.anton.ui.theme.Anton.Canvas)) {
-        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(14.dp)) {
-            androidx.compose.material3.Text("Activity", style = `in`.mrgb.anton.ui.theme.Type.Title, color = `in`.mrgb.anton.ui.theme.Anton.TextPrimary)
+private fun ActivityScreen(
+    sessions: List<`in`.mrgb.anton.data.api.SessionDto>,
+    onOpen: (String) -> Unit,
+    tabIndex: Int,
+    onNav: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Text("Activity", style = Type.Title, color = Anton.TextPrimary)
         }
-        androidx.compose.foundation.layout.Box(Modifier.weight(1f), contentAlignment = androidx.compose.ui.Alignment.Center) {
-            androidx.compose.material3.Text("Recent agent events land here", style = `in`.mrgb.anton.ui.theme.Type.Meta, color = `in`.mrgb.anton.ui.theme.Anton.TextTertiary)
+        val recent = sessions.sortedByDescending { it.resolvedAt ?: it.pinnedAt ?: it.createdAt }
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
+            item { SectionLabel("Recent", recent.size) }
+            items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
         }
-        `in`.mrgb.anton.ui.screens.BottomBar(tabIndex, onNav)
+        BottomBar(tabIndex, onNav)
     }
 }
 
