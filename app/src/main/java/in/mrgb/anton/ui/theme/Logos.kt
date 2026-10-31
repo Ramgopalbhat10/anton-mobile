@@ -30,6 +30,22 @@ object Logos {
     fun forModel(id: String, vendor: String? = null): Logo? =
         BY_SLUG[slugOf(id)] ?: vendor?.lowercase()?.replace(' ', '-')?.let { BY_SLUG[it] ?: BY_SLUG[it.removeSuffix("ai").trimEnd('-')] }
 
+    /**
+     * Where a model's calls go, by the name the picker gives the source: a plan
+     * (ChatGPT, Claude, OpenCode Go, Cursor) or a gateway (OpenRouter, Vercel).
+     */
+    fun forSource(name: String): Logo? = SOURCES[name.lowercase()]
+        ?: BY_SLUG[name.lowercase().replace(' ', '-')] ?: BY_SLUG[name.lowercase().substringBefore(' ')]
+
+    private val SOURCES: Map<String, Logo> = mapOf(
+        "chatgpt" to Logo(R.drawable.logo_openai, true),
+        "claude" to Logo(R.drawable.logo_claude, false),
+        "opencode go" to Logo(R.drawable.logo_opencode, true),
+        "cursor" to Logo(R.drawable.logo_cursor, true),
+        "openrouter" to Logo(R.drawable.logo_openrouter, false),
+        "vercel ai gateway" to Logo(R.drawable.logo_vercel, true),
+    )
+
     /** By the vendor part of a model id, with the web's aliases. */
     private val BY_SLUG: Map<String, Logo> = mapOf(
         "ai21" to Logo(R.drawable.logo_ai21, true),

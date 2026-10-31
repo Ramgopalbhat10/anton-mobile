@@ -116,7 +116,8 @@ fun NewTaskSheet(
                             model?.let { Catalog.chipLabel(models, it) } ?: "Model",
                             onClick = { modelMenu = true }, open = modelMenu,
                             dot = if (model == null) Anton.Accent else null,
-                            leading = model?.let { id -> { Catalog.find(models, id).let { m -> ModelLogo(m?.id ?: id, m?.vendor, 13.dp) } } },
+                            leading = model?.let { id -> { ModelMark(Catalog.find(models, id), id, 13.dp) } },
+                            trailing = model?.let { id -> { ModelFacts(models, id, reasoning) } },
                         )
                         if (modelMenu) {
                             ModelPickerSheet(

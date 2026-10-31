@@ -71,7 +71,8 @@ fun CoordinatorScreen(
                     placeholder = "Tell the coordinator what $name needs",
                     working = sending, sending = sending,
                     model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
-                    modelIcon = if (model.isBlank()) null else ({ Catalog.find(models, model).let { m -> ModelLogo(m?.id ?: model, m?.vendor, 13.dp) } }),
+                    modelIcon = if (model.isBlank()) null else ({ ModelMark(Catalog.find(models, model), model, 13.dp) }),
+                    modelFacts = if (model.isBlank()) null else ({ ModelFacts(models, model, reasoning) }),
                     onSend = onSend, onStop = {},
                     onOpenModel = onLoadModels,
                     modelPicker = { dismiss ->

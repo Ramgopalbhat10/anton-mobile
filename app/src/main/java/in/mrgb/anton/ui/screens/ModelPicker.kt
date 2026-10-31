@@ -220,7 +220,7 @@ fun ModelPicker(
             ) {
                 Pill("All", listed.size, on = source == null) { source = null }
                 sources.forEach { s ->
-                    Pill(s.name, s.count, on = source == s.name, icon = if (s.plan) Lucide.Shield else Lucide.Server) {
+                    Pill(s.name, s.count, on = source == s.name, leading = { SourceMark(s.name, s.plan, 14.dp) }) {
                         source = if (source == s.name) null else s.name
                     }
                 }
@@ -277,19 +277,89 @@ fun ModelPicker(
 fun ModelLogo(id: String, vendor: String?, size: androidx.compose.ui.unit.Dp = 14.dp) {
     val logo = remember(id, vendor) { Logos.forModel(id, vendor) }
     when {
-        logo == null -> {
-            val name = vendor?.ifBlank { null } ?: Logos.slugOf(id)
-            Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(Catalog.vendorHue(name).copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-                Text(name.take(1).uppercase(), style = Type.SmallMedium.copy(fontSize = (size.value * 0.6f).sp, lineHeight = (size.value * 0.7f).sp), color = Catalog.vendorHue(name), maxLines = 1)
-            }
-        }
+        logo == null -> InitialTile(vendor?.ifBlank { null } ?: Logos.slugOf(id), size)
         logo.mono -> Icon(androidx.compose.ui.res.painterResource(logo.res), vendor, tint = Anton.TextPrimary, modifier = Modifier.size(size))
         else -> androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(logo.res), vendor, Modifier.size(size))
     }
 }
 
+/** The accent dot that marks a model on a plan you pay for, on its mark's corner. */
 @Composable
-private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = null, check: Boolean = false, onClick: () -> Unit) {
+fun PlanDot(modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 6.dp) {
+    Box(modifier.size(size + 3.dp).clip(CircleShape).background(Anton.Raised), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(size).clip(CircleShape).background(Anton.Accent))
+    }
+}
+
+/** A source's logo (a plan's or a gateway's), its initial when the set has none; a plan's carries the dot. */
+@Composable
+fun SourceMark(name: String, plan: Boolean, size: androidx.compose.ui.unit.Dp = 14.dp) {
+    val logo = remember(name) { Logos.forSource(name) }
+    Box {
+        when {
+            logo == null -> InitialTile(name, size)
+            logo.mono -> Icon(androidx.compose.ui.res.painterResource(logo.res), name, tint = Anton.TextPrimary, modifier = Modifier.size(size))
+            else -> androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(logo.res), name, Modifier.size(size))
+        }
+        if (plan) PlanDot(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp), size = (size.value * 0.36f).coerceAtLeast(4f).dp)
+    }
+}
+
+/**
+ * What the composer chip leads with: where the model's calls go. A plan model
+ * shows its plan's logo (ChatGPT, Claude, Cursor…) with the accent dot; any
+ * other shows its vendor's logo.
+ */
+@Composable
+fun ModelMark(model: ModelDto?, id: String, size: androidx.compose.ui.unit.Dp = 14.dp) {
+    val plan = model?.subscription
+    if (plan != null && Logos.forSource(plan) != null) SourceMark(plan, plan = true, size = size)
+    else Box {
+        ModelLogo(model?.id ?: id, model?.vendor, size)
+        if (plan != null) PlanDot(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp), size = (size.value * 0.36f).coerceAtLeast(4f).dp)
+    }
+}
+
+/**
+ * The chosen model's settings, small enough to sit in the chip: effort as a
+ * four-step meter, the context when the model comes in more than one, and a
+ * bolt for fast mode.
+ */
+@Composable
+fun ModelFacts(models: List<ModelDto>, id: String, reasoning: String?) {
+    val m = Catalog.find(models, id) ?: return
+    val opts = Catalog.optionsOf(models, m)
+    val base = opts.base
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        if (base.reasoning.isNotEmpty()) {
+            val level = Catalog.effective(base, reasoning)
+            val steps = base.reasoning.filter { it != "off" }
+            val strength = if (level == "off" || steps.isEmpty()) 0f else (steps.indexOf(level) + 1f) / steps.size
+            val lit = kotlin.math.ceil(strength * 4).toInt()
+            Row(Modifier.height(10.dp), horizontalArrangement = Arrangement.spacedBy(1.5.dp), verticalAlignment = Alignment.Bottom) {
+                for (i in 0 until 4) {
+                    Box(Modifier.width(2.5.dp).height((4 + i * 2).dp).clip(RoundedCornerShape(1.dp)).background(if (i < lit) Anton.Accent else Anton.N600))
+                }
+            }
+        }
+        if (opts.contexts.size > 1) {
+            val tag = m.variant?.context
+            val tokens = opts.contexts.firstOrNull { it.first == tag }?.second ?: base.contextLength
+            Text(Catalog.tokens(tokens), style = Type.Num.copy(fontSize = 10.5.sp), color = Anton.TextTertiary, maxLines = 1)
+        }
+        if (m.variant?.fast == true) Icon(Lucide.Zap, "Fast", tint = Anton.Warning, modifier = Modifier.size(11.dp))
+    }
+}
+
+@Composable
+private fun InitialTile(name: String, size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(Catalog.vendorHue(name).copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+        Text(name.take(1).uppercase(), style = Type.SmallMedium.copy(fontSize = (size.value * 0.6f).sp, lineHeight = (size.value * 0.7f).sp), color = Catalog.vendorHue(name), maxLines = 1)
+    }
+}
+
+@Composable
+private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = null, check: Boolean = false, leading: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
         Modifier.height(28.dp).clip(shape)
@@ -300,6 +370,7 @@ private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = n
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         val tint = if (on) Anton.AccentHover else Anton.IconTertiary
+        leading?.invoke()
         if (check && on) Icon(Lucide.Check, null, tint = tint, modifier = Modifier.size(12.dp))
         else icon?.let { Icon(it, null, tint = tint, modifier = Modifier.size(12.dp)) }
         Text(label, style = Type.SmallMedium, color = if (on) Anton.AccentHover else Anton.TextSecondary, maxLines = 1)
@@ -320,6 +391,7 @@ private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> 
         val tile = RoundedCornerShape(8.dp)
         Box(Modifier.size(30.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
             ModelLogo(m.id, m.vendor, 16.dp)
+            if (m.subscription != null) PlanDot(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -358,7 +430,7 @@ private fun OptionsPanel(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModelLogo(model.id, model.vendor, 18.dp)
+            ModelMark(model, model.id, 18.dp)
             Text(Catalog.shortName(model), style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Badge(Catalog.sourceOf(model), if (model.subscription != null) Tone.Accent else Tone.Neutral)
         }
