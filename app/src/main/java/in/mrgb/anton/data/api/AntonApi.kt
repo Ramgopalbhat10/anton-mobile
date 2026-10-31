@@ -107,8 +107,45 @@ class AntonApi(private val config: () -> ServerConfig) {
      * and priming — the mobile facade deliberately doesn't re-implement them.
      */
     /** flue's admission shape: POST {kind:"user", body:text} → 202. */
-    /** A project's coordinator conversation, normalized like a task transcript. */
-    suspend fun spaceMessages(spaceId: String) = get<MessagesResponse>("/api/mobile/spaces/$spaceId/messages").messages
+    /**
+     * A project's coordinator conversation, from the same public agent router the
+     * web hits; the flue wire shape is flattened into PartDto like the facade does.
+     */
+    suspend fun spaceMessages(spaceId: String): List<MessageDto> {
+        val body = get<JsonObject>("/api/agents/coordinator/$spaceId")
+        val raw = body["messages"] as? kotlinx.serialization.json.JsonArray ?: return emptyList()
+        return raw.mapNotNull { el ->
+            val m = el as? JsonObject ?: return@mapNotNull null
+            val role = m["role"]?.toString()?.trim('"') ?: "assistant"
+            if (role == "system" || m["display"]?.toString()?.contains("diagnostic") == true) return@mapNotNull null
+            val parts = (m["parts"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { pel ->
+                val p = pel as? JsonObject ?: return@mapNotNull null
+                val type = p["type"]?.toString()?.trim('"') ?: ""
+                val text = p["text"]?.toString()?.let { if (it == "null") null else it.trim('"').replace("\\n", "\n") }
+                val data = (p["input"] ?: p["data"] ?: p) as? JsonObject
+                when {
+                    type == "text" -> PartDto(type = "text", text = text)
+                    type == "reasoning" -> PartDto(type = "reasoning", text = text)
+                    type == "dynamic-tool" || type.startsWith("tool-") -> PartDto(
+                        type = "tool",
+                        name = (p["toolName"] ?: p["name"])?.toString()?.trim('"') ?: type.removePrefix("tool-"),
+                        state = p["state"]?.toString()?.trim('"'),
+                        title = (p["title"] ?: p["description"])?.toString()?.trim('"'),
+                    )
+                    type == "file" || type == "data-file" -> PartDto(
+                        type = "file",
+                        path = (p["filename"] ?: p["path"] ?: p["url"])?.toString()?.trim('"'),
+                    )
+                    data?.get("question") != null -> PartDto(
+                        type = "ask",
+                        question = data["question"]?.toString()?.trim('"'),
+                    )
+                    else -> PartDto(type = "raw", text = text)
+                }
+            }
+            MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = parts)
+        }
+    }
 
     /** Message the project's coordinator — the flue admission body, same as a task prompt. */
     suspend fun sendCoordinator(spaceId: String, text: String) = post<JsonObject>(

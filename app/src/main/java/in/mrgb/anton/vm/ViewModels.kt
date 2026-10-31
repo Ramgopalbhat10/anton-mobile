@@ -155,6 +155,8 @@ class SettingsViewModel(private val store: SettingsStore) : ViewModel() {
 class NewTaskViewModel(private val repo: AntonRepository, private val store: SettingsStore) : ViewModel() {
     val repos = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val branches = MutableStateFlow<List<String>>(emptyList())
+    val defaultBranch = MutableStateFlow<String?>(null)
+    private var repoDefaults = mapOf<String, String>()
     val models = MutableStateFlow<List<ModelDto>>(emptyList())
     val creating = MutableStateFlow(false)
     val planFirst = store.planFirst.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -163,8 +165,9 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     init {
         viewModelScope.launch {
             runCatching { repo.api.projects() }.onSuccess { list ->
-                repos.value = list.map { it.id to it.fullName.ifBlank { it.name } }
-                // Branches for the default repo so the chip isn't empty on open.
+                repoDefaults = list.associate { it.id to it.defaultBranch }
+                repos.value = list.map { it.id to it.repoFullName }
+                defaultBranch.value = list.firstOrNull()?.defaultBranch
                 repos.value.firstOrNull()?.first?.let { pickRepo(it) }
             }
             runCatching { repo.api.models() }.onSuccess { r -> models.value = r.models }
@@ -173,6 +176,7 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
 
     fun pickRepo(projectId: String?) = viewModelScope.launch {
         branches.value = emptyList()
+        defaultBranch.value = repoDefaults[projectId]
         if (projectId == null) return@launch
         runCatching { repo.api.branches(projectId) }.onSuccess { branches.value = it }
     }

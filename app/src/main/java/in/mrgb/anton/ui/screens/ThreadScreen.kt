@@ -395,10 +395,14 @@ private fun Composer(
     val focusManager = LocalFocusManager.current
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 6.dp, bottom = 10.dp)) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp)).background(Anton.CardBg)) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp))
+                .background(Anton.CardBg).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             BasicTextField(
                 value = text, onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).heightIn(min = 40.dp),
+                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
                 textStyle = Type.Body.copy(color = Anton.TextPrimary),
                 cursorBrush = SolidColor(Anton.Accent),
                 decorationBox = { inner ->
@@ -409,55 +413,36 @@ private fun Composer(
                     inner()
                 },
             )
-            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                GhostIconButton(Icons.Outlined.AttachFile, "Attach")
-                if (model.isNotBlank()) {
-                    Box {
-                        Row(
-                            Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(6.dp))
-                                .clickable { onLoadModels(); modelMenu = true }
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(model, style = Type.Meta, color = Anton.TextSecondary)
-                            Icon(Icons.Outlined.KeyboardArrowDown, "Model", tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
-                        }
-                        if (modelMenu) {
-                            ModelPickerSheet(
-                                models = models,
-                                selected = model,
-                                onPick = { modelMenu = false; onModel(it) },
-                                onDismiss = { modelMenu = false },
-                            )
-                        }
+            if (model.isNotBlank()) {
+                Box {
+                    SheetChip(null, model, true) { onLoadModels(); modelMenu = true }
+                    if (modelMenu) {
+                        ModelPickerSheet(
+                            models = models,
+                            selected = model,
+                            onPick = { modelMenu = false; onModel(it) },
+                            onDismiss = { modelMenu = false },
+                        )
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                Box(
-                    Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
-                        .background(if (working) Anton.Raised else Anton.Accent)
-                        .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
-                        .clickable {
-                            if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
-                        if (working) "Stop" else "Send",
-                        tint = if (working) Anton.Danger else Anton.AccentFg,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
+            }
+            Box(
+                Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
+                    .background(if (working) Anton.Raised else Anton.Accent)
+                    .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
+                    .clickable {
+                        if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
+                    if (working) "Stop" else "Send",
+                    tint = if (working) Anton.Danger else Anton.AccentFg,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
-        Text(
-            if (working) "SANDBOX LIVE · SENT TEXT QUEUES, STOP HALTS" else if (sending) "SENDING…" else "",
-            style = Type.MonoLabel.copy(fontSize = 10.sp),
-            color = Anton.TextDisabled,
-            modifier = Modifier.padding(start = 2.dp, top = 6.dp),
-        )
     }
     }
 }
@@ -465,7 +450,7 @@ private fun Composer(
 /** Full model picker — search field + models grouped by vendor, like the web dropdown. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModelPickerSheet(
+fun ModelPickerSheet(
     models: List<ModelDto>,
     selected: String,
     onPick: (String) -> Unit,

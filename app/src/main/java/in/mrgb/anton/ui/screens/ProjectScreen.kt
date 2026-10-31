@@ -61,7 +61,8 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
         androidx.compose.runtime.LaunchedEffect(refreshing) {
             if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
         }
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.fillMaxWidth()) {
         LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(spaces, key = { it.id }) { space ->
                 Row(
@@ -83,6 +84,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
                     Text(space.countsLine().substringBefore(" ·"), style = Type.Num, color = Anton.TextDisabled)
                 }
             }
+        }
         }
         }
         BottomBar(tabIndex, onNav)

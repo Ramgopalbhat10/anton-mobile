@@ -9,7 +9,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
@@ -38,6 +37,7 @@ import `in`.mrgb.anton.ui.theme.Type
 fun NewTaskSheet(
     repos: List<Pair<String, String>>, // id → name
     branches: List<String>,
+    defaultBranch: String?,
     models: List<ModelDto>,
     planFirst: Boolean,
     creating: Boolean,
@@ -55,13 +55,9 @@ fun NewTaskSheet(
     var modelMenu by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp, 18.dp, 0.dp, 0.dp)).background(Anton.Raised)
-            .padding(horizontal = 14.dp).padding(top = 10.dp, bottom = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxWidth().background(Anton.Raised)
+            .padding(horizontal = 12.dp).padding(top = 2.dp, bottom = 10.dp),
     ) {
-        Box(Modifier.align(Alignment.CenterHorizontally).size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Anton.N600))
-        Text("New task", style = Type.Title, color = Anton.TextPrimary)
-
         // The prompt card — the same well as the thread composer.
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp)).background(Anton.CardBg)) {
             BasicTextField(
@@ -100,7 +96,7 @@ fun NewTaskSheet(
                 // Branch chip → dropdown (repo tasks only)
                 if (repo != null) {
                     Box {
-                        SheetChip(Icons.Outlined.AccountTree, branch ?: "main", true) { branchMenu = true }
+                        SheetChip(Icons.Outlined.AccountTree, branch ?: defaultBranch ?: "main", true) { branchMenu = true }
                         DropdownMenu(
                             expanded = branchMenu, onDismissRequest = { branchMenu = false },
                             modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 300.dp),
@@ -114,31 +110,20 @@ fun NewTaskSheet(
                         }
                     }
                 }
-                // Model chip → dropdown (full list)
+                // Model chip → the shared searchable picker (search + vendor groups)
                 Box {
                     SheetChip(
                         null,
                         models.firstOrNull { it.id == model }?.name ?: model?.substringAfterLast('/') ?: "Model",
                         true,
                     ) { modelMenu = true }
-                    DropdownMenu(
-                        expanded = modelMenu, onDismissRequest = { modelMenu = false },
-                        modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 320.dp),
-                    ) {
-                        models.forEach { m ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Column {
-                                            Text(m.name.ifBlank { m.id }, style = Type.Small, color = if (m.id == model) Anton.Accent else Anton.TextPrimary)
-                                            m.vendor?.let { Text(it, style = Type.MonoLabel.copy(fontSize = 9.5.sp), color = Anton.TextDisabled) }
-                                        }
-                                        if (m.id == model) Icon(Icons.Outlined.Check, null, tint = Anton.Accent, modifier = Modifier.size(12.dp))
-                                    }
-                                },
-                                onClick = { model = m.id; modelMenu = false },
-                            )
-                        }
+                    if (modelMenu) {
+                        ModelPickerSheet(
+                            models = models,
+                            selected = model ?: "",
+                            onPick = { model = it; modelMenu = false },
+                            onDismiss = { modelMenu = false },
+                        )
                     }
                 }
                 Spacer(Modifier.weight(1f))

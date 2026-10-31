@@ -136,7 +136,7 @@ data class ModelsResponse(
 )
 
 @Serializable
-data class RepoDto(val id: String = "", val name: String = "", val fullName: String = "")
+data class RepoDto(val id: String = "", val repoFullName: String = "", val defaultBranch: String = "main")
 
 @Serializable
 data class ProjectsResponse(val projects: List<RepoDto> = emptyList())

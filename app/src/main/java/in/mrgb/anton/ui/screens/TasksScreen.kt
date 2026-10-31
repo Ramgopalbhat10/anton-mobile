@@ -195,12 +195,6 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
                     Text(it, style = Type.Meta, color = Anton.DangerText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 }
             }
-            val tok = s.usage.inputTokens + s.usage.outputTokens
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("$${"%.2f".format(s.usage.cost)}", style = Type.Num, color = Anton.TextSecondary)
-                Text("·", style = Type.Num, color = Anton.TextDisabled)
-                Text(if (tok > 0) "${"%.1f".format(tok / 1000f)}k tok" else "—", style = Type.Num, color = Anton.TextTertiary)
-            }
         }
     }
 }

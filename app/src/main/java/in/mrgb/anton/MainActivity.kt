@@ -191,6 +191,7 @@ private fun App() {
             NewTaskSheet(
                 repos = vm.repos.collectAsState().value,
                 branches = vm.branches.collectAsState().value,
+                defaultBranch = vm.defaultBranch.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 planFirst = vm.planFirst.collectAsState().value,
                 creating = vm.creating.collectAsState().value,
@@ -227,11 +228,13 @@ private fun ActivityScreen(
         LaunchedEffect(refreshing) {
             if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
         }
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.fillMaxWidth()) {
             LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item { SectionLabel("Recent", recent.size) }
                 items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
             }
+        }
         }
         BottomBar(tabIndex, onNav)
     }
