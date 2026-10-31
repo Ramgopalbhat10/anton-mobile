@@ -216,9 +216,7 @@ private fun PartView(p: PartDto) {
  * expanding lists each step — tools as rows with status, thoughts expandable inline. */
 @Composable
 private fun StepsCard(parts: List<PartDto>) {
-    var open by remember {
-        mutableStateOf(parts.any { it.state != null && it.state !in setOf("done", "completed", "success") })
-    }
+    var open by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
             .border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))

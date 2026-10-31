@@ -151,7 +151,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
             .clickable { onOpen(s.id) }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StateGlyph(s.glyph())
             Text(
                 s.title.ifBlank { "Untitled" },
@@ -178,7 +178,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
             Text(ageOf(s.createdAt), style = Type.Num, color = Anton.TextDisabled)
         }
         Row(
-            Modifier.padding(top = 3.dp),
+            Modifier.fillMaxWidth().padding(top = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
