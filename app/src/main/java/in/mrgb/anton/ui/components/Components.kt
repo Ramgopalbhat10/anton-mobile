@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Icon
@@ -244,9 +246,9 @@ fun SheetChip(icon: ImageVector?, label: String, arrow: Boolean = false, onClick
 }
 
 /**
- * The shared composer — one row inside a card: text field, model chip at the
- * right end, send/stop. Used by the thread view and the coordinator view so
- * both look and behave identically.
+ * The shared composer — the web's chat composer: a card with the input on
+ * top and a compact footer row (attach + model on the left, send/stop on
+ * the right). Used by the thread and coordinator views so both are identical.
  */
 @Composable
 fun AntonComposer(
@@ -262,14 +264,13 @@ fun AntonComposer(
     var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var modelMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    Row(
+    Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp))
-            .background(Anton.CardBg).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .background(Anton.CardBg),
     ) {
         androidx.compose.foundation.text.BasicTextField(
             value = text, onValueChange = { text = it },
-            modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(start = 12.dp, end = 12.dp, top = 10.dp),
             textStyle = Type.Body.copy(color = Anton.TextPrimary),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(Anton.Accent),
             decorationBox = { inner ->
@@ -277,27 +278,43 @@ fun AntonComposer(
                 inner()
             },
         )
-        if (model.isNotBlank()) {
-            Box {
-                SheetChip(null, model, true) { onOpenModel(); modelMenu = true }
-                if (modelMenu) modelPicker { modelMenu = false }
-            }
-        }
-        Box(
-            Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
-                .background(if (working) Anton.Raised else Anton.Accent)
-                .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
-                .clickable {
-                    if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
-                },
-            contentAlignment = Alignment.Center,
+        Row(
+            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(
-                if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
-                if (working) "Stop" else "Send",
-                tint = if (working) Anton.Danger else Anton.AccentFg,
-                modifier = Modifier.size(14.dp),
+                Icons.Outlined.Add, "Add",
+                tint = Anton.IconDisabled,
+                modifier = Modifier.size(26.dp).clip(RoundedCornerShape(6.dp)).clickable { }.padding(5.dp),
             )
+            Icon(
+                Icons.Outlined.AttachFile, "Attach",
+                tint = Anton.IconDisabled,
+                modifier = Modifier.size(26.dp).clip(RoundedCornerShape(6.dp)).clickable { }.padding(5.dp),
+            )
+            if (model.isNotBlank()) {
+                Box {
+                    SheetChip(null, model, true) { onOpenModel(); modelMenu = true }
+                    if (modelMenu) modelPicker { modelMenu = false }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
+                    .background(if (working) Anton.Raised else Anton.Accent)
+                    .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
+                    .clickable {
+                        if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
+                    if (working) "Stop" else "Send",
+                    tint = if (working) Anton.Danger else Anton.AccentFg,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
     }
 }

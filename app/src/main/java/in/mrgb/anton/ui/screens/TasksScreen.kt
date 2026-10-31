@@ -234,13 +234,11 @@ fun BottomBar(selected: Int, onNav: (Int) -> Unit) {
         Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).background(Anton.Canvas).padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         items.forEach { (label, icon, i) ->
-            Column(
-                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { onNav(i) }.padding(vertical = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { onNav(i) }.padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, label, tint = if (i == selected) Anton.Accent else Anton.IconDisabled, modifier = Modifier.size(18.dp))
-                Text(label, style = Type.MonoLabel.copy(fontSize = 10.5.sp, letterSpacing = 0.02.sp), color = if (i == selected) Anton.Accent else Anton.IconDisabled)
+                Icon(icon, label, tint = if (i == selected) Anton.Accent else Anton.IconDisabled, modifier = Modifier.size(20.dp))
             }
         }
     }

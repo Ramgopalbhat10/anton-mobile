@@ -125,6 +125,8 @@ class AntonApi(private val config: () -> ServerConfig) {
                 val text = p["text"]?.toString()?.let { if (it == "null") null else it.trim('"').replace("\\n", "\n") }
                     ?.replace(Regex("<attachment[^>]*/?>|<attachment[^>]*>.*?</attachment>", RegexOption.DOT_MATCHES_ALL), "")
                     ?.replace(Regex("<thread-[a-z-]+[^>]*>.*?</thread-[a-z-]+>|<thread-[a-z-]+[^>]*/?>", RegexOption.DOT_MATCHES_ALL), "")
+                    ?.replace(Regex("</?attachment[^>]*>|</?thread-[a-z-]+[^>]*>", RegexOption.DOT_MATCHES_ALL), "")
+                    ?.replace(Regex("An image: given with this message.*?cannot see\\.?", RegexOption.DOT_MATCHES_ALL), "")
                     ?.trim()?.ifBlank { null }
                 val data = (p["input"] ?: p["data"] ?: p) as? JsonObject
                 when {
@@ -148,6 +150,7 @@ class AntonApi(private val config: () -> ServerConfig) {
                 }
             }
             MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = parts)
+                .takeIf { it.parts.isNotEmpty() }
         }
     }
 
