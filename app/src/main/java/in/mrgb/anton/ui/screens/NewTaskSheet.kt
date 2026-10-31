@@ -1,37 +1,40 @@
 package `in`.mrgb.anton.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountTree
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.data.api.ModelDto
-import `in`.mrgb.anton.ui.components.AntonSwitch
-import `in`.mrgb.anton.ui.components.SheetChip
+import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
+import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
 
 /**
  * The new-task drawer — the web composer's anatomy: a prompt card with a
- * footer row of dropdown chips (repo · branch · model · plan) and Start.
+ * footer row of select triggers (repo · branch · model · plan) and Start.
+ * Repo and branch open anchored shadcn menus (searchable when long); the
+ * model opens the shared model sheet.
  */
 @Composable
 fun NewTaskSheet(
@@ -50,97 +53,90 @@ fun NewTaskSheet(
     var branch by remember { mutableStateOf(branches.firstOrNull()) }
     var prompt by remember { mutableStateOf("") }
     var model by remember { mutableStateOf(models.firstOrNull()?.id) }
-    var repoMenu by remember { mutableStateOf(false) }
-    var branchMenu by remember { mutableStateOf(false) }
     var modelMenu by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    Column(
-        Modifier.fillMaxWidth().background(Anton.Raised)
-            .padding(horizontal = 12.dp).padding(top = 2.dp, bottom = 10.dp),
-    ) {
-        // The prompt card — the same well as the thread composer.
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp)).background(Anton.CardBg)) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "prompt")
+    val canStart = prompt.isNotBlank() && !creating
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
+        val shape = RoundedCornerShape(14.dp)
+        Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
             BasicTextField(
                 value = prompt, onValueChange = { prompt = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).heightIn(min = 56.dp),
-                textStyle = Type.Body.copy(color = Anton.TextPrimary),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp).heightIn(min = 72.dp).focusRequester(focus),
+                textStyle = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp, color = Anton.TextPrimary),
                 cursorBrush = SolidColor(Anton.Accent),
+                maxLines = 10,
+                interactionSource = interaction,
                 decorationBox = { inner ->
-                    if (prompt.isBlank()) Text("What should the agent do?", style = Type.Body, color = Anton.TextTertiary)
+                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp), color = Anton.TextTertiary)
                     inner()
                 },
             )
             Row(
-                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                // Repo chip → dropdown
-                Box {
-                    SheetChip(Icons.Outlined.Folder, repos.firstOrNull { it.first == repo }?.second?.substringAfterLast('/') ?: "Chat", true) { repoMenu = true }
-                    DropdownMenu(
-                        expanded = repoMenu, onDismissRequest = { repoMenu = false },
-                        modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp)).heightIn(max = 280.dp),
-                        containerColor = Anton.Overlay,
-                        shadowElevation = 8.dp,
-                    ) {
-                        DropdownMenuItem(
-                            modifier = Modifier.height(30.dp),
-                            text = { Text("Chat (no repo)", style = Type.Small, color = if (repo == null) Anton.Accent else Anton.TextPrimary) },
-                            onClick = { repo = null; branch = null; onRepo(null); repoMenu = false },
+                // Chips keep their full labels and the row scrolls sideways when they don't fit.
+                Row(
+                    Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AntonSelect(
+                        options = listOf(SelectOption<String?>(null, "Chat (no repo)", "No sandbox repo")) +
+                            repos.map { (id, name) -> SelectOption<String?>(id, name.substringAfterLast('/'), name.substringBeforeLast('/', "").ifBlank { null }) },
+                        selected = repo,
+                        onSelect = { id -> repo = id; branch = null; onRepo(id) },
+                        label = repos.firstOrNull { it.first == repo }?.second?.substringAfterLast('/') ?: "Chat",
+                        icon = if (repo == null) Lucide.MessageSquare else Lucide.Github,
+                        searchPlaceholder = "Search repositories…",
+                        modifier = Modifier.widthIn(max = 180.dp),
+                    )
+                    if (repo != null) {
+                        val current = branch ?: defaultBranch ?: "main"
+                        AntonSelect(
+                            options = branches.ifEmpty { listOf(current) }.map { SelectOption(it, it) },
+                            selected = current,
+                            onSelect = { branch = it },
+                            label = current,
+                            icon = Lucide.GitBranch,
+                            mono = true,
+                            searchPlaceholder = "Search branches…",
+                            menuWidth = 300.dp,
+                            modifier = Modifier.widthIn(max = 200.dp),
                         )
-                        repos.forEach { (id, name) ->
-                            DropdownMenuItem(
-                                modifier = Modifier.height(30.dp),
-                                text = { Text(name, style = Type.Small, color = if (id == repo) Anton.Accent else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                onClick = { repo = id; branch = null; onRepo(id); repoMenu = false },
+                    }
+                    Box(Modifier.widthIn(max = 180.dp)) {
+                        SelectChip(
+                            models.firstOrNull { it.id == model }?.name ?: model?.substringAfterLast('/') ?: "Model",
+                            onClick = { modelMenu = true }, dot = Anton.Accent, open = modelMenu,
+                        )
+                        if (modelMenu) {
+                            ModelPickerSheet(
+                                models = models,
+                                selected = model ?: "",
+                                onPick = { model = it; modelMenu = false },
+                                onDismiss = { modelMenu = false },
                             )
                         }
                     }
                 }
-                // Branch chip → dropdown (repo tasks only)
-                if (repo != null) {
-                    Box {
-                        SheetChip(Icons.Outlined.AccountTree, branch ?: defaultBranch ?: "main", true) { branchMenu = true }
-                        DropdownMenu(
-                            expanded = branchMenu, onDismissRequest = { branchMenu = false },
-                            modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp)).heightIn(max = 280.dp),
-                            containerColor = Anton.Overlay,
-                            shadowElevation = 8.dp,
-                        ) {
-                            branches.forEach { b ->
-                                DropdownMenuItem(
-                                    modifier = Modifier.height(30.dp),
-                                    text = { Text(b, style = Type.Small, color = if (b == branch) Anton.Accent else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = { branch = b; branchMenu = false },
-                                )
-                            }
-                        }
-                    }
-                }
-                // Model chip → the shared searchable picker (search + vendor groups)
-                Box {
-                    SheetChip(
-                        null,
-                        models.firstOrNull { it.id == model }?.name ?: model?.substringAfterLast('/') ?: "Model",
-                        true,
-                    ) { modelMenu = true }
-                    if (modelMenu) {
-                        ModelPickerSheet(
-                            models = models,
-                            selected = model ?: "",
-                            onPick = { model = it; modelMenu = false },
-                            onDismiss = { modelMenu = false },
-                        )
-                    }
-                }
-                Spacer(Modifier.weight(1f))
                 AntonSwitch(planFirst, onPlanFirst)
                 Box(
-                    Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
-                        .background(if (prompt.isBlank() || creating) Anton.N700 else Anton.Accent)
-                        .clickable(enabled = prompt.isNotBlank() && !creating) { onStart(repo, branch, prompt, model) },
+                    Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+                        .background(if (canStart) Anton.Accent else Anton.N750)
+                        .clickable(enabled = canStart, role = Role.Button) { onStart(repo, branch, prompt, model) },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Outlined.ArrowUpward, if (creating) "Starting…" else "Start task", tint = if (prompt.isBlank() || creating) Anton.TextDisabled else Anton.AccentFg, modifier = Modifier.size(15.dp)) }
+                ) {
+                    Icon(
+                        Lucide.ArrowUp, if (creating) "Starting…" else "Start task",
+                        tint = if (canStart) Anton.AccentFg else Anton.TextDisabled, modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }

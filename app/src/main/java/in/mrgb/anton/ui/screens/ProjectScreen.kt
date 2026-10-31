@@ -6,10 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,16 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
+import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
 
 private fun SpaceDto.countsLine(): String {
@@ -41,49 +34,43 @@ private fun SpaceDto.countsLine(): String {
 }
 
 /** Projects tab root: the list of spaces. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit, onOpen: (String) -> Unit, tabIndex: Int, onNav: (Int) -> Unit) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Projects", style = Type.Title, color = Anton.TextPrimary, modifier = Modifier.weight(1f))
-        }
+        AppBar("Projects")
         if (spaces.isEmpty() && error != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(10.dp)).border(1.dp, Anton.Danger.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    .background(Anton.DangerBg).padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text("Can't reach the server — ${error.take(80)}", style = Type.Meta, color = Anton.DangerText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        var refreshing by remember { mutableStateOf(false) }
-        androidx.compose.runtime.LaunchedEffect(refreshing) {
-            if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
+            ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.fillMaxWidth()) {
-        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AntonRefreshBox(onRefresh, Modifier.contentWidth().fillMaxHeight()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items(spaces, key = { it.id }) { space ->
+                val live = (space.counts["working"] ?: 0) > 0
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 10.dp, vertical = 9.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 10.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
-                        Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp)).background(Anton.Raised),
+                        Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(Anton.CardGradient).border(1.dp, Anton.CardBorder, RoundedCornerShape(9.dp)),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Outlined.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp)) }
-                    Column(Modifier.weight(1f)) {
+                    ) {
+                        if (space.icon.isNotBlank() && space.icon.length <= 4) Text(space.icon, style = Type.Body)
+                        else Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp))
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(space.name.ifBlank { space.id }, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (space.goal.isNotBlank()) space.goal else space.countsLine(),
                             style = Type.Meta, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Text(space.countsLine().substringBefore(" ·"), style = Type.Num, color = Anton.TextDisabled)
+                    if (live) Box(Modifier.size(6.dp).clip(CircleShape).background(Anton.Accent))
+                    Text("${space.counts.values.sum()}", style = Type.Num, color = Anton.TextDisabled)
+                    Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(14.dp))
                 }
             }
+            if (spaces.isEmpty() && error == null) item { EmptyState(Lucide.Folder, "No projects yet", "Create a project on the web to group threads.") }
         }
         }
         }
@@ -94,34 +81,36 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
 /** A space's page: coordinator card, then its threads in the same row anatomy as Tasks. */
 @Composable
 fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () -> Unit, onOpenThread: (String) -> Unit, onOpenCoordinator: (String) -> Unit) {
+    val openFeed = { onOpenCoordinator(space?.name ?: "Project") }
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
-        Row(Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            GhostIconButton(Icons.Outlined.ArrowBack, "Back", onBack)
-            Icon(Icons.Outlined.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(17.dp))
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(space?.name?.ifBlank { "Project" } ?: "Project", style = Type.Title, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(space?.countsLine() ?: "", style = Type.Meta, color = Anton.TextTertiary)
-            }
-        }
+        AppBar(
+            space?.name?.ifBlank { "Project" } ?: "Project",
+            subtitle = space?.let { s -> listOfNotNull(s.repoIds.size.takeIf { it > 0 }?.let { "$it repos" }, s.countsLine()).joinToString(" · ") },
+            onBack = onBack,
+            divider = true,
+            leading = { Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(2.dp)) },
+        )
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(vertical = 14.dp)) {
             item {
-                AntonCard(Modifier.fillMaxWidth().clickable { onOpenCoordinator(space?.name ?: "Project") }) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
-                            Text("⌘", style = Type.Num, color = Anton.Accent)
-                        }
+                AntonCard(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clickable(onClick = openFeed)) {
+                    Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Lucide.Sparkles, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
                         Column(Modifier.weight(1f)) {
                             Text("Coordinator", style = Type.BodyMedium, color = Anton.TextPrimary)
                             Text("Watching ${threads.size} threads", style = Type.Meta, color = Anton.TextTertiary)
                         }
-                        Box(Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Anton.Accent))
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(Anton.Accent))
                     }
+                    AntonButton("Open feed", onClick = openFeed, variant = ButtonVariant.Outline, modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp))
                 }
             }
-            item { SectionLabel("Threads", threads.size) }
+            item { SectionLabel("Threads", threads.size, Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 4.dp)) }
             items(threads, key = { it.id }) { s -> TaskRow(s, onOpenThread) }
+            if (threads.isEmpty()) item { EmptyState(Lucide.Inbox, "No threads yet", "Ask the coordinator to start one.") }
         }
         }
     }
