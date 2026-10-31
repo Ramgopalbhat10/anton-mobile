@@ -260,7 +260,7 @@ fun <T> Segmented(
 /* ── Labels ── */
 
 @Composable
-fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
+fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 6.dp)) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text.uppercase(), style = Type.MonoLabel, color = Anton.TextDisabled)
         count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
@@ -423,7 +423,7 @@ fun AntonInput(
 /** A form field: mono micro label over a control, like the web's settings forms. */
 @Composable
 fun Field(label: String, modifier: Modifier = Modifier, hint: String? = null, content: @Composable () -> Unit) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = Type.SmallMedium, color = Anton.TextSecondary)
         content()
         hint?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary) }
@@ -522,8 +522,8 @@ fun ListRow(
         modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 52.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -533,7 +533,7 @@ fun ListRow(
                 contentAlignment = Alignment.Center,
             ) { Icon(it, null, tint = Anton.IconSecondary, modifier = Modifier.size(14.dp)) }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             subtitle?.let {
                 Text(
@@ -554,8 +554,8 @@ fun ErrorNotice(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier.fillMaxWidth().clip(shape).background(Anton.DangerBg).border(1.dp, Anton.DangerBorder, shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(Lucide.CircleAlert, null, tint = Anton.Danger, modifier = Modifier.size(15.dp).padding(top = 1.dp))
         Text(text, style = Type.Meta, color = Anton.DangerText, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -614,7 +614,7 @@ fun AntonComposer(
     ) {
         BasicTextField(
             value = text, onValueChange = { text = it },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
             textStyle = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp, color = Anton.TextPrimary),
             cursorBrush = SolidColor(Anton.Accent),
             maxLines = 6,
@@ -625,10 +625,10 @@ fun AntonComposer(
             },
         )
         Row(
-            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
+            Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp)
                 GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp)
                 if (model.isNotBlank()) {
@@ -676,7 +676,7 @@ fun TraceRow(text: String, detail: String? = null, live: Boolean = false) {
         1f, 0.35f, infiniteRepeatable(tween(800), androidx.compose.animation.core.RepeatMode.Reverse), label = "a",
     )
     Row(
-        Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 8.dp),
+        Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

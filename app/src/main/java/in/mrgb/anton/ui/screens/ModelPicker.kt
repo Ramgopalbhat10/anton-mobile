@@ -215,8 +215,8 @@ fun ModelPicker(
         // Where the calls go: every source, each plan you pay for, each gateway.
         if (sources.size > 1) {
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Pill("All", listed.size, on = source == null) { source = null }
                 sources.forEach { s ->
@@ -227,8 +227,8 @@ fun ModelPicker(
             }
         }
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Lucide.ListFilter, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
             Catalog.Filter.entries.forEach { f ->
@@ -243,7 +243,7 @@ fun ModelPicker(
             // Vendors in the order the sort puts their best model.
             shown.groupBy { it.vendor ?: it.provider ?: "Other" }.forEach { (vendor, group) ->
                 item(key = "v-$vendor") {
-                    Row(Modifier.padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(Modifier.padding(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         group.first().let { ModelLogo(it.id, it.vendor, 12.dp) }
                         SectionLabel(vendor, group.size, Modifier)
                     }
@@ -362,12 +362,12 @@ private fun InitialTile(name: String, size: androidx.compose.ui.unit.Dp) {
 private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = null, check: Boolean = false, leading: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
-        Modifier.height(28.dp).clip(shape)
+        Modifier.height(30.dp).clip(shape)
             .background(if (on) Anton.AccentBg else Anton.InputBg)
             .border(1.dp, if (on) Anton.AccentBorder else Anton.Input, shape)
             .clickable(role = Role.Checkbox, onClick = onClick)
-            .padding(horizontal = 9.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+            .padding(horizontal = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val tint = if (on) Anton.AccentHover else Anton.IconTertiary
         leading?.invoke()
@@ -384,16 +384,16 @@ private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> 
         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
             .background(if (on) Anton.AccentBg else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val tile = RoundedCornerShape(8.dp)
-        Box(Modifier.size(30.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(32.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
             ModelLogo(m.id, m.vendor, 16.dp)
             if (m.subscription != null) PlanDot(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp))
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(Catalog.shortName(m), style = Type.BodyMedium, color = if (on) Anton.AccentHover else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (m.reasoning.isNotEmpty()) Icon(Lucide.Brain, "Reasons", tint = Anton.IconDisabled, modifier = Modifier.size(12.dp))
@@ -426,8 +426,8 @@ private fun OptionsPanel(
         Modifier.fillMaxWidth().hairlineTop(Anton.BorderDefault)
             .background(Brush.verticalGradient(listOf(Anton.Overlay, Anton.Raised)))
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ModelMark(model, model.id, 18.dp)
@@ -460,7 +460,7 @@ private fun OptionsPanel(
 
 @Composable
 private fun OptionRow(label: String, icon: ImageVector, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp))
             Text(label.uppercase(), style = Type.MonoLabel, color = Anton.TextTertiary)
@@ -481,7 +481,7 @@ private fun <T> Segments(options: List<Pair<T, String>>, selected: T, onSelect: 
             val on = value == selected
             val shape = RoundedCornerShape(7.dp)
             Box(
-                Modifier.weight(1f).height(30.dp).clip(shape)
+                Modifier.weight(1f).height(32.dp).clip(shape)
                     .then(if (on) Modifier.background(Brush.verticalGradient(listOf(Anton.N700, Anton.N750))).border(1.dp, Anton.BorderDefault, shape) else Modifier)
                     .clickable(role = Role.Tab) { onSelect(value) },
                 contentAlignment = Alignment.Center,

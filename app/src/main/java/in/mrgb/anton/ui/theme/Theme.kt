@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.R
 import kotlinx.coroutines.launch
 
@@ -157,18 +158,38 @@ private val scheme = darkColorScheme(
 )
 
 /**
- * Anton's type scale (signal-tokens.css): body 13/18, small 12/16, micro 11,
+ * Anton's type scale (signal-tokens.css): body 13/19, small 12/16, meta 11.5/17,
  * titles 16 semibold; mono labels 10.5 uppercase tracking .08em. All Geist.
  */
+/**
+ * Spacing scale (dp). Everything sits on a 2/4dp grid; the named roles are
+ * what screens reach for so the rhythm stays the same app-wide.
+ * See docs/design/mobile-design-kit.md.
+ */
+object Space {
+    val Xxs = 2.dp
+    val Xs = 4.dp
+    val Sm = 8.dp
+    val Md = 12.dp
+    val Lg = 16.dp
+    val Xl = 20.dp
+    val Xxl = 24.dp
+
+    /** Screen edge to content. */
+    val Gutter = 18.dp
+    /** Between turns in a transcript. */
+    val Turn = 20.dp
+}
+
 object Type {
     private val base = TextStyle(fontFamily = GeistSans)
     private val mono = TextStyle(fontFamily = GeistMono)
     val Title = base.copy(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp)
     val Heading = base.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp)
-    val Body = base.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal)
-    val BodyMedium = base.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
-    val BodyLarge = base.copy(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
-    val Meta = base.copy(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
+    val Body = base.copy(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
+    val BodyMedium = base.copy(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
+    val BodyLarge = base.copy(fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal)
+    val Meta = base.copy(fontSize = 11.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.Normal)
     val Small = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
     val SmallMedium = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
     val MonoLabel = mono.copy(

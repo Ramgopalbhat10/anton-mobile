@@ -31,6 +31,7 @@ import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 
 enum class TasksTab(val label: String) { All("All"), Running("Running"), NeedsYou("Needs you"), Done("Done") }
@@ -64,10 +65,10 @@ fun AppBar(
         modifier
             .fillMaxWidth()
             .then(if (divider) Modifier.hairlineBottom() else Modifier)
-            .heightIn(min = 52.dp)
-            .padding(start = if (onBack != null) 6.dp else 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            .heightIn(min = 56.dp)
+            .padding(start = if (onBack != null) 8.dp else Space.Gutter, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         onBack?.let { GhostIconButton(Lucide.ChevronLeft, "Back", tint = Anton.IconSecondary, iconSize = 20.dp, onClick = it) }
         leading?.invoke(this)
@@ -133,7 +134,7 @@ fun TasksScreen(
                     query, onQuery,
                     placeholder = "Search tasks and repos…",
                     leadingIcon = Lucide.Search,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(top = 2.dp, bottom = 8.dp).focusRequester(focus),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Gutter).padding(top = 4.dp, bottom = 12.dp).focusRequester(focus),
                     trailing = if (query.isNotEmpty()) ({
                         Icon(
                             Lucide.X, "Clear", tint = Anton.IconTertiary,
@@ -142,7 +143,7 @@ fun TasksScreen(
                     }) else null,
                 )
             }
-            Box(Modifier.padding(horizontal = 14.dp).padding(top = 2.dp, bottom = 2.dp)) {
+            Box(Modifier.padding(horizontal = Space.Gutter).padding(top = 4.dp, bottom = 6.dp)) {
                 Segmented(
                     options = TasksTab.entries.map { it to it.label },
                     selected = tab,
@@ -152,10 +153,10 @@ fun TasksScreen(
             }
             val shown = sessions.filter { it.matches(tab) && it.matchesQuery(query) }
             if (sessions.isEmpty() && error != null) {
-                ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = Space.Gutter, vertical = 10.dp))
             }
             AntonRefreshBox(onRefresh, Modifier.weight(1f)) {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 90.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 104.dp)) {
                     for (kind in groups) {
                         val rows = shown.filter { it.glyph() == kind }
                         if (rows.isEmpty()) continue
@@ -177,7 +178,7 @@ fun TasksScreen(
             }
             BottomBar(tabIndex, onNav)
         }
-        Fab(onNew, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 74.dp))
+        Fab(onNew, Modifier.align(Alignment.BottomEnd).padding(end = Space.Gutter, bottom = 82.dp))
     }
 }
 
@@ -189,13 +190,13 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 1.dp)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable { onOpen(s.id) }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StateGlyph(glyph)
             Text(
                 s.title.ifBlank { "Untitled" },
@@ -221,7 +222,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
             Text(ageOf(s.createdAt), style = Type.Num, color = Anton.TextDisabled)
         }
         Row(
-            Modifier.fillMaxWidth().padding(start = 22.dp),
+            Modifier.fillMaxWidth().padding(start = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -273,12 +274,12 @@ fun BottomBar(selected: Int, onNav: (Int) -> Unit) {
         Triple("Settings", Lucide.Settings, 3),
     )
     Row(
-        Modifier.fillMaxWidth().background(Anton.Canvas).hairlineTop().padding(start = 8.dp, end = 8.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().background(Anton.Canvas).hairlineTop().padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 6.dp),
     ) {
         items.forEach { (label, icon, i) ->
             val on = i == selected
             Box(
-                Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Tab) { onNav(i) },
+                Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Tab) { onNav(i) },
                 contentAlignment = Alignment.Center,
             ) {
                 if (on) Box(Modifier.align(Alignment.TopCenter).padding(top = 0.dp).size(width = 18.dp, height = 2.dp).clip(RoundedCornerShape(1.dp)).background(Anton.Accent))

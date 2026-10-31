@@ -271,8 +271,8 @@ fun WorkCard(
     val shape = RoundedCornerShape(12.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)) {
         Row(
-            Modifier.fillMaxWidth().clickable { open = !open }.heightIn(min = 40.dp).padding(start = 12.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().clickable { open = !open }.heightIn(min = 44.dp).padding(start = 14.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
                 if (live) Spinner(12.dp)
@@ -301,8 +301,8 @@ fun WorkCard(
                         val x = 20.dp.toPx()
                         drawRect(Anton.BorderDefault, Offset(x - 0.5.dp.toPx(), 16.dp.toPx()), androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height - 32.dp.toPx()))
                     }
-                    .padding(start = 8.dp, end = 10.dp, top = 6.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+                    .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 parts.forEach { p ->
                     when {
@@ -336,7 +336,7 @@ private fun StepStrip(steps: List<PartDto>, live: Boolean) {
 /** A step's mark on the rail: it sits over the line so the line runs between steps. */
 @Composable
 private fun Node(size: Dp = 24.dp, content: @Composable BoxScope.() -> Unit) {
-    Box(Modifier.size(width = size, height = 26.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(width = size, height = 30.dp), contentAlignment = Alignment.Center) {
         Box(Modifier.size(18.dp).clip(CircleShape).background(Anton.CardBg), contentAlignment = Alignment.Center, content = content)
     }
 }
@@ -430,7 +430,7 @@ private fun AgentStep(p: PartDto) {
     val answer = run?.result ?: (p.errorText ?: p.output.outputText()).takeIf { it.isNotBlank() }
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }.padding(vertical = 3.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }.padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {

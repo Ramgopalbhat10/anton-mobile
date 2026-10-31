@@ -21,6 +21,7 @@ import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 
 private fun SpaceDto.countsLine(): String {
@@ -39,15 +40,15 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         AppBar("Projects")
         if (spaces.isEmpty() && error != null) {
-            ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+            ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = Space.Gutter, vertical = 10.dp))
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         AntonRefreshBox(onRefresh, Modifier.contentWidth().fillMaxHeight()) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(spaces, key = { it.id }) { space ->
                 val live = (space.counts["working"] ?: 0) > 0
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 10.dp, vertical = 10.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 12.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -58,7 +59,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
                         if (space.icon.isNotBlank() && space.icon.length <= 4) Text(space.icon, style = Type.Body)
                         else Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp))
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(space.name.ifBlank { space.id }, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (space.goal.isNotBlank()) space.goal else space.countsLine(),
@@ -91,10 +92,10 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
             leading = { Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(2.dp)) },
         )
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(vertical = 14.dp)) {
+        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(vertical = 18.dp)) {
             item {
-                AntonCard(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clickable(onClick = openFeed)) {
-                    Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                AntonCard(Modifier.fillMaxWidth().padding(horizontal = Space.Gutter).clickable(onClick = openFeed)) {
+                    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
                             contentAlignment = Alignment.Center,
@@ -105,10 +106,10 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
                         }
                         Box(Modifier.size(6.dp).clip(CircleShape).background(Anton.Accent))
                     }
-                    AntonButton("Open feed", onClick = openFeed, variant = ButtonVariant.Outline, modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp))
+                    AntonButton("Open feed", onClick = openFeed, variant = ButtonVariant.Outline, modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp))
                 }
             }
-            item { SectionLabel("Threads", threads.size, Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 4.dp)) }
+            item { SectionLabel("Threads", threads.size, Modifier.padding(start = 18.dp, end = 18.dp, top = 24.dp, bottom = 8.dp)) }
             items(threads, key = { it.id }) { s -> TaskRow(s, onOpenThread) }
             if (threads.isEmpty()) item { EmptyState(Lucide.Inbox, "No threads yet", "Ask the coordinator to start one.") }
         }

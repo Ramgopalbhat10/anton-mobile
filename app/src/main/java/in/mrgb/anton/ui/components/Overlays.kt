@@ -155,11 +155,11 @@ fun MenuItem(
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 34.dp)
+            .heightIn(min = 38.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(if (checked) Anton.Hover else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
@@ -183,7 +183,7 @@ fun MenuItem(
 /** shadcn DropdownMenuLabel / SelectLabel. */
 @Composable
 fun MenuLabel(text: String, count: Int? = null) {
-    Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text.uppercase(), style = Type.MonoLabel.copy(fontSize = 10.sp), color = Anton.TextDisabled)
         count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
     }
@@ -276,9 +276,9 @@ fun AntonSheet(
     ) {
         Column(Modifier.fillMaxWidth()) {
             if (title != null) {
-                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 12.dp)) {
+                Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp)) {
                     Text(title, style = Type.Heading, color = Anton.TextPrimary)
-                    subtitle?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary, modifier = Modifier.padding(top = 2.dp)) }
+                    subtitle?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary, modifier = Modifier.padding(top = 4.dp)) }
                 }
             }
             content()

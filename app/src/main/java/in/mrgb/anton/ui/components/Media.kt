@@ -169,9 +169,9 @@ fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Mo
     Row(
         modifier.widthIn(max = 260.dp).clip(shape).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, shape)
             .then(if (imageUrl != null && viewer != null) Modifier.clickable { viewer(imageUrl, name) } else Modifier)
-            .padding(start = 5.dp, end = 11.dp, top = 5.dp, bottom = 5.dp),
+            .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         val tile = RoundedCornerShape(6.dp)
         Box(Modifier.size(28.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
@@ -191,7 +191,7 @@ fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Mo
 fun SentAttachments(files: List<Attachments.Ref>, modifier: Modifier = Modifier) {
     if (files.isEmpty()) return
     val place = LocalFilePlace.current
-    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEach { f ->
             FileChip(f.name, "${f.kind} · ${Attachments.size(f.size)}", imageUrl = if (f.image) place.attachment(f) else null)
         }
@@ -234,7 +234,7 @@ fun ReplyOutputs(paths: List<String>) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReplyFiles(files: List<Triple<String, String, Boolean>>) {
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEach { (path, url, image) ->
             val folder = path.substringBeforeLast('/', "").ifBlank { null }
             val ext = path.substringAfterLast('.', "").uppercase().ifBlank { null }
