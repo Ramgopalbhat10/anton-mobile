@@ -11,6 +11,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import `in`.mrgb.anton.ui.components.contentWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -42,7 +43,8 @@ fun SettingsScreen(
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Settings", style = Type.Title, color = Anton.TextPrimary, modifier = Modifier.weight(1f))
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.contentWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel("Server")
             AntonCard(Modifier.fillMaxWidth()) {
                 FieldRow("Server URL", baseUrl, placeholder = "https://code.mrgb.in") { url -> onServer(url, cfId, cfSecret) }
@@ -68,6 +70,7 @@ fun SettingsScreen(
                 Divider()
                 ToggleRow("Plan first", "new tasks open in plan mode", planFirst, onTogglePlanFirst)
             }
+        }
         }
         BottomBar(tabIndex, onNav)
     }

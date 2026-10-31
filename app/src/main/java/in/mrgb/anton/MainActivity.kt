@@ -46,6 +46,7 @@ private sealed class Screen {
     data object Settings : Screen()
     data class Thread(val id: String) : Screen()
     data class Project(val id: String) : Screen()
+    data class Coordinator(val id: String, val name: String) : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -68,7 +69,7 @@ private fun App() {
 
     val tabIndex = when (screen) {
         is Screen.Tasks -> 0
-        is Screen.Projects, is Screen.Project -> 1
+        is Screen.Projects, is Screen.Project, is Screen.Coordinator -> 1
         is Screen.Activity -> 2
         is Screen.Settings -> 3
         is Screen.Thread -> 0
@@ -122,6 +123,17 @@ private fun App() {
                 threads = vm.threads.collectAsState().value,
                 onBack = { back.removeLast() },
                 onOpenThread = { push(Screen.Thread(it)) },
+                onOpenCoordinator = { push(Screen.Coordinator(s.id, it)) },
+            )
+        }
+        is Screen.Coordinator -> {
+            val vm = projectsVm(app)
+            CoordinatorScreen(
+                name = s.name,
+                messages = vm.coordinatorMessages.collectAsState().value,
+                sending = vm.sending.collectAsState().value,
+                onSend = { vm.sendCoordinator(s.id, it) },
+                onBack = { back.removeLast() },
             )
         }
         is Screen.Thread -> {
@@ -178,12 +190,14 @@ private fun App() {
         ) {
             NewTaskSheet(
                 repos = vm.repos.collectAsState().value,
+                branches = vm.branches.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 planFirst = vm.planFirst.collectAsState().value,
                 creating = vm.creating.collectAsState().value,
+                onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
-                onStart = { pid, prompt, model ->
-                    vm.start(pid, prompt, model) { id ->
+                onStart = { pid, branch, prompt, model ->
+                    vm.start(pid, branch, prompt, model) { id ->
                         newTask = false
                         if (id != null) push(Screen.Thread(id))
                     }

@@ -116,9 +116,24 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             .onFailure { error.value = it.message }
     }
 
+    val coordinatorMessages = MutableStateFlow<List<MessageDto>>(emptyList())
+    val sending = MutableStateFlow(false)
+
     fun open(id: String) = viewModelScope.launch {
         runCatching { repo.space(id) }.onSuccess { _detail.value = it }
         runCatching { repo.sessions() }.onSuccess { list -> _threads.value = list.filter { it.spaceId == id } }
+        refreshCoordinator(id)
+    }
+
+    fun refreshCoordinator(id: String) = viewModelScope.launch {
+        runCatching { repo.api.spaceMessages(id) }.onSuccess { coordinatorMessages.value = it }
+    }
+
+    fun sendCoordinator(id: String, text: String) = viewModelScope.launch {
+        sending.value = true
+        runCatching { repo.api.sendCoordinator(id, text) }.onFailure { error.value = it.message }
+        sending.value = false
+        refreshCoordinator(id)
     }
 }
 
@@ -139,7 +154,8 @@ class SettingsViewModel(private val store: SettingsStore) : ViewModel() {
 
 class NewTaskViewModel(private val repo: AntonRepository, private val store: SettingsStore) : ViewModel() {
     val repos = MutableStateFlow<List<Pair<String, String>>>(emptyList())
-    val models = MutableStateFlow<List<String>>(emptyList())
+    val branches = MutableStateFlow<List<String>>(emptyList())
+    val models = MutableStateFlow<List<ModelDto>>(emptyList())
     val creating = MutableStateFlow(false)
     val planFirst = store.planFirst.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val error = MutableStateFlow<String?>(null)
@@ -148,21 +164,27 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
         viewModelScope.launch {
             runCatching { repo.api.projects() }.onSuccess { list ->
                 repos.value = list.map { it.id to it.fullName.ifBlank { it.name } }
+                // Branches for the default repo so the chip isn't empty on open.
+                repos.value.firstOrNull()?.first?.let { pickRepo(it) }
             }
-            runCatching { repo.api.models() }.onSuccess { r ->
-                models.value = (r.pinned.ifEmpty { r.models.map { it.id } }).take(4)
-            }
+            runCatching { repo.api.models() }.onSuccess { r -> models.value = r.models }
         }
+    }
+
+    fun pickRepo(projectId: String?) = viewModelScope.launch {
+        branches.value = emptyList()
+        if (projectId == null) return@launch
+        runCatching { repo.api.branches(projectId) }.onSuccess { branches.value = it }
     }
 
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
-    fun start(projectId: String?, prompt: String, model: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
+    fun start(projectId: String?, branch: String?, prompt: String, model: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
         creating.value = true
         error.value = null
         val created = runCatching {
             repo.api.createSession(
-                CreateSessionRequest(projectId = projectId, titleFrom = prompt.take(200), model = model, planMode = planFirst.value)
+                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = prompt.take(200), model = model, planMode = planFirst.value)
             )
         }
         val id = created.getOrNull()?.id

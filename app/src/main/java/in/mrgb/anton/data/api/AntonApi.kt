@@ -107,6 +107,15 @@ class AntonApi(private val config: () -> ServerConfig) {
      * and priming — the mobile facade deliberately doesn't re-implement them.
      */
     /** flue's admission shape: POST {kind:"user", body:text} → 202. */
+    /** A project's coordinator conversation, normalized like a task transcript. */
+    suspend fun spaceMessages(spaceId: String) = get<MessagesResponse>("/api/mobile/spaces/$spaceId/messages").messages
+
+    /** Message the project's coordinator — the flue admission body, same as a task prompt. */
+    suspend fun sendCoordinator(spaceId: String, text: String) = post<JsonObject>(
+        "/api/agents/coordinator/$spaceId",
+        """{"kind":"user","body":${json.encodeToString(kotlinx.serialization.serializer(), text)}}""",
+    )
+
     suspend fun sendMessage(sessionId: String, text: String) =
         post<JsonObject>(
             "/api/agents/coder/$sessionId",

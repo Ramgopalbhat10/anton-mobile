@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -221,6 +223,20 @@ fun SectionLabel(text: String, count: Int? = null) {
     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text.uppercase(), style = Type.MonoLabel, color = Anton.TextDisabled)
         count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
+    }
+}
+
+/** A small composer chip: optional icon + label + chevron, like the web's pickers. */
+@Composable
+fun SheetChip(icon: ImageVector?, label: String, arrow: Boolean = false, onClick: () -> Unit) {
+    Row(
+        Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(7.dp))
+            .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(11.dp)) }
+        Text(label, style = Type.Meta, color = Anton.TextSecondary, maxLines = 1)
+        if (arrow) Icon(Icons.Outlined.KeyboardArrowDown, null, tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
     }
 }
 

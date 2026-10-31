@@ -91,7 +91,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
 
 /** A space's page: coordinator card, then its threads in the same row anatomy as Tasks. */
 @Composable
-fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () -> Unit, onOpenThread: (String) -> Unit) {
+fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () -> Unit, onOpenThread: (String) -> Unit, onOpenCoordinator: (String) -> Unit) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GhostIconButton(Icons.Outlined.ArrowBack, "Back", onBack)
@@ -105,7 +105,7 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                AntonCard(Modifier.fillMaxWidth()) {
+                AntonCard(Modifier.fillMaxWidth().clickable { onOpenCoordinator(space?.name ?: "Project") }) {
                     Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
                             Text("⌘", style = Type.Num, color = Anton.Accent)

@@ -76,6 +76,8 @@ fun TasksScreen(
                 GhostIconButton(Icons.Outlined.Search, "Search") { searching = !searching; if (!searching) onQuery("") }
                 GhostIconButton(Icons.Outlined.Add, "New task", onNew)
             }
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.contentWidth().fillMaxHeight()) {
             if (searching) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 6.dp)
@@ -125,7 +127,7 @@ fun TasksScreen(
                 if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
             }
             PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
-                LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(bottom = 90.dp)) {
+                LazyColumn(Modifier.fillMaxHeight(), contentPadding = PaddingValues(bottom = 90.dp)) {
                     for (kind in groups) {
                         val rows = shown.filter { it.glyph() == kind }
                         if (rows.isEmpty()) continue
@@ -133,6 +135,8 @@ fun TasksScreen(
                         items(rows, key = { it.id }) { s -> TaskRow(s, onOpen) }
                     }
                 }
+            }
+            }
             }
             BottomBar(tabIndex, onNav)
         }

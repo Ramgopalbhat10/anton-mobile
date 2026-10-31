@@ -169,7 +169,7 @@ private fun mdType() = markdownTypography(
 )
 
 @Composable
-private fun UserMessage(m: MessageDto) {
+fun UserMessage(m: MessageDto) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         Box(
             Modifier
@@ -185,7 +185,7 @@ private fun UserMessage(m: MessageDto) {
 }
 
 @Composable
-private fun AgentMessage(m: MessageDto) {
+fun AgentMessage(m: MessageDto) {
     // The web collapses the work strip (reasoning + tools + files) into one
     // "N STEPS" card between text replies; mirror that grouping here.
     val chunks = mutableListOf<List<PartDto>>()
@@ -393,7 +393,8 @@ private fun Composer(
     var text by remember { mutableStateOf("") }
     var modelMenu by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    Column(Modifier.fillMaxWidth().border(width = 1.dp, color = Anton.BorderSubtle).padding(horizontal = 12.dp).padding(top = 8.dp, bottom = 12.dp)) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 6.dp, bottom = 10.dp)) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp)).background(Anton.CardBg)) {
             BasicTextField(
                 value = text, onValueChange = { text = it },
@@ -457,6 +458,7 @@ private fun Composer(
             color = Anton.TextDisabled,
             modifier = Modifier.padding(start = 2.dp, top = 6.dp),
         )
+    }
     }
 }
 
