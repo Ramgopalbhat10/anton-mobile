@@ -1,5 +1,5 @@
-Model vendor logos in app/src/main/java/in/mrgb/anton/ui/theme/Logos.kt are
-converted from @lobehub/icons-static-svg 1.95.1 (https://github.com/lobehub/lobe-icons),
+Model vendor logos in app/src/main/res/drawable/logo_*.xml are converted, with
+Android's Svg2Vector, from @lobehub/icons-static-svg 1.95.1 (https://github.com/lobehub/lobe-icons),
 the same set the Anton web app uses (src/web/lib/provider-logos.ts).
 
 MIT License

@@ -283,8 +283,8 @@ fun ModelLogo(id: String, vendor: String?, size: androidx.compose.ui.unit.Dp = 1
                 Text(name.take(1).uppercase(), style = Type.SmallMedium.copy(fontSize = (size.value * 0.6f).sp, lineHeight = (size.value * 0.7f).sp), color = Catalog.vendorHue(name), maxLines = 1)
             }
         }
-        logo.mono -> Icon(logo.vector, vendor, tint = Anton.TextPrimary, modifier = Modifier.size(size))
-        else -> androidx.compose.foundation.Image(androidx.compose.ui.graphics.vector.rememberVectorPainter(logo.vector), vendor, Modifier.size(size))
+        logo.mono -> Icon(androidx.compose.ui.res.painterResource(logo.res), vendor, tint = Anton.TextPrimary, modifier = Modifier.size(size))
+        else -> androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(logo.res), vendor, Modifier.size(size))
     }
 }
 
