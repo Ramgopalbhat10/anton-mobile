@@ -221,16 +221,28 @@ fun ImageCard(url: String, name: String, modifier: Modifier = Modifier, height: 
     }
 }
 
-/** What a reply made for you, under its words: image cards that open the viewer, other files as chips. */
+/** What a reply made for you, under its words, as file chips. */
 @Composable
 fun ReplyOutputs(paths: List<String>) {
     val place = LocalFilePlace.current
     val shown = paths.mapNotNull { p -> place.output(p)?.let { p to it } }
     if (shown.isEmpty()) return
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        shown.forEach { (path, url) ->
-            if (Attachments.isImagePath(path)) ImageCard(url, path)
-            else FileChip(path.substringAfterLast('/'), path.substringBeforeLast('/', "").ifBlank { "Library" })
+    ReplyFiles(shown.map { (path, url) -> Triple(path, url, Attachments.isImagePath(path)) })
+}
+
+/** Files a reply made, as the same small chips a sent message's attachments use; an image chip opens the viewer. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReplyFiles(files: List<Triple<String, String, Boolean>>) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        files.forEach { (path, url, image) ->
+            val folder = path.substringBeforeLast('/', "").ifBlank { null }
+            val ext = path.substringAfterLast('.', "").uppercase().ifBlank { null }
+            FileChip(
+                path.substringAfterLast('/'),
+                listOfNotNull(if (image) "${ext ?: "Image"} image" else ext, folder ?: "Library").joinToString(" · "),
+                imageUrl = if (image) url else null,
+            )
         }
     }
 }

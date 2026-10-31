@@ -220,8 +220,10 @@ private fun PartView(p: PartDto) {
         "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
         "ask" -> AskCard(p)
         "thread" -> ThreadCard(p)
-        "file" -> if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, p.title ?: p.path ?: "Image")
-            else p.path?.let { FileChip(it.substringAfterLast('/'), p.mediaType) }
+        "file" -> (p.title ?: p.path)?.let { name ->
+            val image = p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()
+            FileChip(name.substringAfterLast('/'), p.mediaType, imageUrl = if (image) p.url else null)
+        }
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
     }
 }
