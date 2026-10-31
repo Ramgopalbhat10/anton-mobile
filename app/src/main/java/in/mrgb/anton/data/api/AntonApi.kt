@@ -57,22 +57,28 @@ class AntonApi(private val config: () -> ServerConfig) {
         Request.Builder().url(url(path)).withAuth().header("Accept", "text/event-stream").build()
 
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(url(path)).withAuth().build()
-        http.newCall(req).execute().use { res ->
-            val text = res.body?.string().orEmpty()
-            if (!res.isSuccessful) throw ApiError(res.code, text)
-            json.decodeFromString(text)
-        }
+        try {
+            val req = Request.Builder().url(url(path)).withAuth().build()
+            http.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (!res.isSuccessful) throw ApiError(res.code, text)
+                json.decodeFromString<T>(text)
+            }
+        } catch (e: ApiError) { throw e }
+        catch (e: Exception) { throw ApiError(0, "$path: ${e.message}") }
     }
 
     private suspend inline fun <reified T> post(path: String, bodyJson: String = "{}"): T = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(url(path)).withAuth()
-            .post(bodyJson.toRequestBody("application/json".toMediaType())).build()
-        http.newCall(req).execute().use { res ->
-            val text = res.body?.string().orEmpty()
-            if (!res.isSuccessful) throw ApiError(res.code, text)
-            if (text.isBlank()) JsonObject(emptyMap()) as T else json.decodeFromString(text)
-        }
+        try {
+            val req = Request.Builder().url(url(path)).withAuth()
+                .post(bodyJson.toRequestBody("application/json".toMediaType())).build()
+            http.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (!res.isSuccessful) throw ApiError(res.code, text)
+                if (text.isBlank()) JsonObject(emptyMap()) as T else json.decodeFromString<T>(text)
+            }
+        } catch (e: ApiError) { throw e }
+        catch (e: Exception) { throw ApiError(0, "$path: ${e.message}") }
     }
 
     suspend fun sessions() = get<SessionsResponse>("/api/mobile/sessions").sessions

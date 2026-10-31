@@ -18,6 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.*
@@ -35,8 +41,9 @@ private fun SpaceDto.countsLine(): String {
 }
 
 /** Projects tab root: the list of spaces. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onOpen: (String) -> Unit, tabIndex: Int, onNav: (Int) -> Unit) {
+fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit, onOpen: (String) -> Unit, tabIndex: Int, onNav: (Int) -> Unit) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Projects", style = Type.Title, color = Anton.TextPrimary, modifier = Modifier.weight(1f))
@@ -50,7 +57,12 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onOpen: (String) -> U
                 Text("Can't reach the server — ${error.take(80)}", style = Type.Meta, color = Anton.DangerText, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        var refreshing by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(refreshing) {
+            if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
+        }
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(spaces, key = { it.id }) { space ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 10.dp, vertical = 9.dp),
@@ -71,6 +83,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onOpen: (String) -> U
                     Text(space.countsLine().substringBefore(" ·"), style = Type.Num, color = Anton.TextDisabled)
                 }
             }
+        }
         }
         BottomBar(tabIndex, onNav)
     }

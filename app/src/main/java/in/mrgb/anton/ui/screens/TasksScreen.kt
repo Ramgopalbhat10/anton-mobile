@@ -27,6 +27,8 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
@@ -48,6 +50,7 @@ private fun SessionDto.matchesQuery(q: String) =
 
 private val groups = listOf(GlyphKind.Failed, GlyphKind.Waiting, GlyphKind.Working, GlyphKind.Queued, GlyphKind.Review, GlyphKind.Landing, GlyphKind.Idle, GlyphKind.Resolved)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
     sessions: List<SessionDto>,
@@ -57,6 +60,7 @@ fun TasksScreen(
     onQuery: (String) -> Unit,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
+    onRefresh: () -> Unit = {},
     error: String? = null,
     tabIndex: Int = 0,
     onNav: (Int) -> Unit = {},
@@ -116,12 +120,18 @@ fun TasksScreen(
                     )
                 }
             }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 90.dp)) {
-                for (kind in groups) {
-                    val rows = shown.filter { it.glyph() == kind }
-                    if (rows.isEmpty()) continue
-                    item { SectionLabel(kind.label, rows.size) }
-                    items(rows, key = { it.id }) { s -> TaskRow(s, onOpen) }
+            var refreshing by remember { mutableStateOf(false) }
+            LaunchedEffect(refreshing) {
+                if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
+            }
+            PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 90.dp)) {
+                    for (kind in groups) {
+                        val rows = shown.filter { it.glyph() == kind }
+                        if (rows.isEmpty()) continue
+                        item { SectionLabel(kind.label, rows.size) }
+                        items(rows, key = { it.id }) { s -> TaskRow(s, onOpen) }
+                    }
                 }
             }
             BottomBar(tabIndex, onNav)

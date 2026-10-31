@@ -2,6 +2,7 @@ package `in`.mrgb.anton
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.ModalBottomSheet
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -55,8 +57,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun App() {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as AntonApp
-    var screen by remember { mutableStateOf<Screen>(Screen.Tasks) }
+    val back = remember { mutableStateListOf<Screen>(Screen.Tasks) }
     var newTask by remember { mutableStateOf(false) }
+    val screen = back.last()
+    val push: (Screen) -> Unit = { back.add(it) }
+    BackHandler(enabled = back.size > 1) { back.removeLast() }
 
     val tabIndex = when (screen) {
         is Screen.Tasks -> 0
@@ -66,12 +71,16 @@ private fun App() {
         is Screen.Thread -> 0
     }
     val nav: (Int) -> Unit = {
-        screen = when (it) {
-            0 -> Screen.Tasks
-            1 -> Screen.Projects
-            2 -> Screen.Activity
-            else -> Screen.Settings
-        }
+        // Tab taps reset the stack to that tab's root.
+        back.clear()
+        back.add(
+            when (it) {
+                0 -> Screen.Tasks
+                1 -> Screen.Projects
+                2 -> Screen.Activity
+                else -> Screen.Settings
+            }
+        )
     }
 
     // Pixel-class gesture nav + camera cutout: keep headers/FAB/tab bar inside the safe area.
@@ -85,8 +94,9 @@ private fun App() {
                 query = vm.query.collectAsState().value,
                 onTab = vm::setTab,
                 onQuery = vm::setQuery,
-                onOpen = { screen = Screen.Thread(it) },
+                onOpen = { push(Screen.Thread(it)) },
                 onNew = { newTask = true },
+                onRefresh = vm::refresh,
                 error = vm.error.collectAsState().value,
                 tabIndex = tabIndex, onNav = nav,
             )
@@ -96,7 +106,8 @@ private fun App() {
             ProjectsScreen(
                 spaces = vm.spaces.collectAsState().value,
                 error = vm.error.collectAsState().value,
-                onOpen = { screen = Screen.Project(it) },
+                onRefresh = vm::refresh,
+                onOpen = { push(Screen.Project(it)) },
                 tabIndex = tabIndex, onNav = nav,
             )
         }
@@ -106,8 +117,8 @@ private fun App() {
             ProjectDetailScreen(
                 space = vm.detail.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
-                onBack = { screen = Screen.Projects },
-                onOpenThread = { screen = Screen.Thread(it) },
+                onBack = { back.removeLast() },
+                onOpenThread = { push(Screen.Thread(it)) },
             )
         }
         is Screen.Thread -> {
@@ -119,7 +130,7 @@ private fun App() {
                 models = vm.models.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
-                onBack = { screen = Screen.Tasks },
+                onBack = { back.removeLast() },
                 onSend = vm::send,
                 onAbort = vm::abort,
                 onStop = vm::stop,
@@ -131,7 +142,8 @@ private fun App() {
             val vm = tasksVm(app)
             ActivityScreen(
                 sessions = vm.sessions.collectAsState().value,
-                onOpen = { screen = Screen.Thread(it) },
+                onRefresh = vm::refresh,
+                onOpen = { push(Screen.Thread(it)) },
                 tabIndex = tabIndex, onNav = nav,
             )
         }
@@ -170,7 +182,7 @@ private fun App() {
                 onStart = { pid, prompt, model ->
                     vm.start(pid, prompt, model) { id ->
                         newTask = false
-                        if (id != null) screen = Screen.Thread(id)
+                        if (id != null) push(Screen.Thread(id))
                     }
                 },
                 onDismiss = { newTask = false },
@@ -180,9 +192,11 @@ private fun App() {
 }
 
 /** Activity: every session, most recently touched first — same row anatomy as Tasks. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActivityScreen(
     sessions: List<`in`.mrgb.anton.data.api.SessionDto>,
+    onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
     tabIndex: Int,
     onNav: (Int) -> Unit,
@@ -192,9 +206,15 @@ private fun ActivityScreen(
             Text("Activity", style = Type.Title, color = Anton.TextPrimary)
         }
         val recent = sessions.sortedByDescending { it.resolvedAt ?: it.pinnedAt ?: it.createdAt }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item { SectionLabel("Recent", recent.size) }
-            items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
+        var refreshing by remember { mutableStateOf(false) }
+        LaunchedEffect(refreshing) {
+            if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
+        }
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                item { SectionLabel("Recent", recent.size) }
+                items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
+            }
         }
         BottomBar(tabIndex, onNav)
     }

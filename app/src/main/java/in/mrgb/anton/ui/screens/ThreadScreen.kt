@@ -12,13 +12,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -170,8 +174,20 @@ private fun UserMessage(m: MessageDto) {
 
 @Composable
 private fun AgentMessage(m: MessageDto) {
+    // The web collapses the work strip (reasoning + tools + files) into one
+    // "N STEPS" card between text replies; mirror that grouping here.
+    val chunks = mutableListOf<List<PartDto>>()
+    for (p in m.parts) {
+        val step = p.type in setOf("reasoning", "tool", "file")
+        if (step && chunks.lastOrNull()?.firstOrNull()?.type in setOf("reasoning", "tool", "file")) {
+            chunks[chunks.lastIndex] = chunks.last() + p
+        } else chunks.add(listOf(p))
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        m.parts.forEach { p -> PartView(p) }
+        chunks.forEach { chunk ->
+            if (chunk.first().type in setOf("reasoning", "tool", "file")) StepsCard(chunk)
+            else PartView(chunk.first())
+        }
     }
 }
 
@@ -179,45 +195,41 @@ private fun AgentMessage(m: MessageDto) {
 private fun PartView(p: PartDto) {
     when (p.type) {
         "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
-        "reasoning" -> ReasoningPart(p.text.orEmpty())
-        "tool" -> TraceRow(p.title ?: p.name ?: "Tool", detail = p.state?.take(24))
-        "file" -> p.path?.let { FileChip(it) }
         "ask" -> AskCard(p)
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
     }
 }
 
-/** Reasoning collapses to a trace row; tap to expand the full thought. */
+/** The collapsed work strip: "N STEPS" with a chevron; expands to per-step rows. */
 @Composable
-private fun ReasoningPart(text: String) {
-    var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }) {
+private fun StepsCard(parts: List<PartDto>) {
+    // Live strips stay expanded like the web; finished strips collapse.
+    var open by remember {
+        mutableStateOf(parts.any { it.state != null && it.state !in setOf("done", "completed", "success") })
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))
+            .background(Anton.WellBg)
+            .clickable { open = !open },
+    ) {
         Row(
-            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.width(3.dp).height(12.dp).clip(RoundedCornerShape(1.5.dp)).background(Anton.N600))
-            Text(
-                if (open) "Reasoning" else text.take(90),
-                style = Type.Small, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Icon(Icons.Outlined.KeyboardArrowDown, if (open) "Collapse" else "Expand", tint = Anton.IconDisabled, modifier = Modifier.size(13.dp))
+            Icon(Icons.Outlined.KeyboardArrowDown, if (open) "Collapse" else "Expand", tint = Anton.IconDisabled, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("${parts.size} STEPS", style = Type.MonoLabel, color = Anton.TextTertiary, modifier = Modifier.weight(1f))
         }
         if (open) {
-            Box(Modifier.padding(start = 11.dp, top = 2.dp, bottom = 2.dp).border(0.dp, Anton.N600).padding(start = 8.dp)) {
-                Markdown(
-                    text,
-                    colors = mdColors().let { c -> markdownColor(text = Anton.TextSecondary, codeText = c.codeText, codeBackground = c.codeBackground, dividerColor = c.dividerColor, linkText = c.linkText) },
-                    typography = markdownTypography(
-                        text = Type.Small.copy(lineHeight = 17.sp), paragraph = Type.Small.copy(lineHeight = 17.sp),
-                        list = Type.Small.copy(lineHeight = 17.sp), bullet = Type.Small, ordered = Type.Small.copy(lineHeight = 17.sp),
-                        code = Type.Num, quote = Type.Small.copy(lineHeight = 17.sp),
-                        h1 = Type.BodyMedium, h2 = Type.BodyMedium, h3 = Type.Small, h4 = Type.Small, h5 = Type.Small, h6 = Type.Small,
-                        link = Type.Small.copy(color = Anton.Accent),
-                    ),
-                )
+            Column(Modifier.padding(bottom = 6.dp)) {
+                parts.forEach { p ->
+                    when (p.type) {
+                        "reasoning" -> TraceRow(p.text?.take(110).orEmpty())
+                        "tool" -> TraceRow(p.title ?: p.name ?: "Tool", detail = p.state?.take(24))
+                        "file" -> p.path?.let { path -> TraceRow(path, detail = "file") }
+                    }
+                }
             }
         }
     }
@@ -308,22 +320,13 @@ private fun Composer(
                             Text(model, style = Type.Meta, color = Anton.TextSecondary)
                             Icon(Icons.Outlined.KeyboardArrowDown, "Model", tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
                         }
-                        DropdownMenu(
-                            expanded = modelMenu, onDismissRequest = { modelMenu = false },
-                            modifier = Modifier.background(Anton.Raised).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 320.dp),
-                        ) {
-                            models.forEach { m ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text(m.name.ifBlank { m.id }, style = Type.Body, color = Anton.TextPrimary)
-                                            Text(m.id.substringAfterLast('/'), style = Type.Meta, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        }
-                                    },
-                                    onClick = { modelMenu = false; onModel(m.id) },
-                                )
-                            }
-                            if (models.isEmpty()) DropdownMenuItem(text = { Text("Loading models…", style = Type.Body, color = Anton.TextTertiary) }, onClick = {})
+                        if (modelMenu) {
+                            ModelPickerSheet(
+                                models = models,
+                                selected = model,
+                                onPick = { modelMenu = false; onModel(it) },
+                                onDismiss = { modelMenu = false },
+                            )
                         }
                     }
                 }
@@ -352,5 +355,62 @@ private fun Composer(
             color = Anton.TextDisabled,
             modifier = Modifier.padding(start = 2.dp, top = 6.dp),
         )
+    }
+}
+
+/** Full model picker — search field + models grouped by vendor, like the web dropdown. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelPickerSheet(
+    models: List<ModelDto>,
+    selected: String,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var q by remember { mutableStateOf("") }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Anton.Raised,
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            AntonWell(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                BasicTextField(
+                    value = q, onValueChange = { q = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    textStyle = Type.Body.copy(color = Anton.TextPrimary),
+                    cursorBrush = SolidColor(Anton.Accent),
+                    decorationBox = { inner ->
+                        if (q.isEmpty()) Text("Search models…", style = Type.Body, color = Anton.TextDisabled)
+                        inner()
+                    },
+                )
+            }
+            val shown = models.filter {
+                q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) || it.vendor?.contains(q, true) == true
+            }
+            LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.7f), contentPadding = PaddingValues(bottom = 24.dp)) {
+                shown.groupBy { it.vendor ?: it.provider ?: "Other" }.forEach { (vendor, group) ->
+                    item { SectionLabel(vendor.uppercase(), group.size) }
+                    items(group, key = { it.id }) { m ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onPick(m.id) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(m.name.ifBlank { m.id }, style = Type.BodyMedium, color = if (m.id == selected) Anton.Accent else Anton.TextPrimary)
+                                val meta = buildList {
+                                    add(m.id)
+                                    if (m.contextLength > 0) add("${m.contextLength / 1000}k ctx")
+                                }.joinToString(" · ")
+                                Text(meta, style = Type.Meta, color = Anton.TextDisabled, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (m.id == selected) Icon(Icons.Outlined.Check, "Current", tint = Anton.Accent, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }

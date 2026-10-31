@@ -126,7 +126,7 @@ data class SpacesResponse(val spaces: List<SpaceDto> = emptyList())
 typealias SpaceDetailDto = SpaceDto
 
 @Serializable
-data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null, val vendor: String? = null)
+data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null, val vendor: String? = null, val contextLength: Long = 0)
 
 @Serializable
 data class ModelsResponse(

@@ -20,15 +20,19 @@ class TasksViewModel(private val repo: AntonRepository) : ViewModel() {
 
     init {
         refresh()
-        // SSE invalidation: a `sessions` change refetches the list.
+        // SSE invalidation: a `sessions` change refetches the list. Poll on top so
+        // a dead stream can't leave the app stale.
         viewModelScope.launch {
             repo.changes.collect { e -> if (e.name == "sessions") refresh() }
+        }
+        viewModelScope.launch {
+            while (true) { kotlinx.coroutines.delay(15_000); refresh() }
         }
     }
 
     fun refresh() = viewModelScope.launch {
         runCatching { repo.sessions() }
-            .onSuccess { _sessions.value = it }
+            .onSuccess { _sessions.value = it; error.value = null }
             .onFailure { error.value = it.message }
     }
 
@@ -53,6 +57,10 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
                 if (e.name.startsWith("task") && e.data?.contains(sessionId) == true) refresh()
                 if (e.name == "sessions") refresh()
             }
+        }
+        // SSE can drop silently behind proxies; poll while the thread is open.
+        viewModelScope.launch {
+            while (true) { kotlinx.coroutines.delay(4_000); refresh() }
         }
     }
 
@@ -104,7 +112,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
 
     fun refresh() = viewModelScope.launch {
         runCatching { repo.spaces() }
-            .onSuccess { _spaces.value = it }
+            .onSuccess { _spaces.value = it; error.value = null }
             .onFailure { error.value = it.message }
     }
 
