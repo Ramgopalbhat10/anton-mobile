@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,12 +24,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.mrgb.anton.ui.components.SectionLabel
+import `in`.mrgb.anton.ui.components.contentWidth
 import `in`.mrgb.anton.ui.screens.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.AntonTheme
@@ -210,8 +213,8 @@ private fun ActivityScreen(
         LaunchedEffect(refreshing) {
             if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
         }
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item { SectionLabel("Recent", recent.size) }
                 items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
             }

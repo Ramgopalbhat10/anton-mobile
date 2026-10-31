@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Type
 
+/** Caps list/thread content on wide screens (tablets); headers and footers stay full-width. */
+fun Modifier.contentWidth(): Modifier = this.fillMaxWidth().widthIn(max = 680.dp)
+
 /* ── State glyphs — exact marks from src/web/components/thread-glyph.tsx ── */
 
 enum class GlyphKind { Failed, Waiting, Working, Queued, Review, Landing, Idle, Resolved }

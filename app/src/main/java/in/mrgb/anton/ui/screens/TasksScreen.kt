@@ -124,8 +124,8 @@ fun TasksScreen(
             LaunchedEffect(refreshing) {
                 if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
             }
-            PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 90.dp)) {
+            PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+                LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(bottom = 90.dp)) {
                     for (kind in groups) {
                         val rows = shown.filter { it.glyph() == kind }
                         if (rows.isEmpty()) continue

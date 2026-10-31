@@ -61,8 +61,8 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
         androidx.compose.runtime.LaunchedEffect(refreshing) {
             if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
         }
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f)) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(spaces, key = { it.id }) { space ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 10.dp, vertical = 9.dp),
@@ -102,7 +102,8 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
                 Text(space?.countsLine() ?: "", style = Type.Meta, color = Anton.TextTertiary)
             }
         }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 AntonCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -119,6 +120,7 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
             }
             item { SectionLabel("Threads", threads.size) }
             items(threads, key = { it.id }) { s -> TaskRow(s, onOpenThread) }
+        }
         }
     }
 }
