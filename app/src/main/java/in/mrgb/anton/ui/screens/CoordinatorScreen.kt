@@ -70,7 +70,8 @@ fun CoordinatorScreen(
                 AntonComposer(
                     placeholder = "Tell the coordinator what $name needs",
                     working = sending, sending = sending,
-                    model = if (model.isBlank()) "" else Catalog.chipLabel(models, model, reasoning),
+                    model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
+                    modelIcon = if (model.isBlank()) null else ({ Catalog.find(models, model).let { m -> ModelLogo(m?.id ?: model, m?.vendor, 13.dp) } }),
                     onSend = onSend, onStop = {},
                     onOpenModel = onLoadModels,
                     modelPicker = { dismiss ->

@@ -113,8 +113,10 @@ fun NewTaskSheet(
                     }
                     Box(Modifier.widthIn(max = 180.dp)) {
                         SelectChip(
-                            model?.let { Catalog.chipLabel(models, it, reasoning) } ?: "Model",
-                            onClick = { modelMenu = true }, dot = Anton.Accent, open = modelMenu,
+                            model?.let { Catalog.chipLabel(models, it) } ?: "Model",
+                            onClick = { modelMenu = true }, open = modelMenu,
+                            dot = if (model == null) Anton.Accent else null,
+                            leading = model?.let { id -> { Catalog.find(models, id).let { m -> ModelLogo(m?.id ?: id, m?.vendor, 13.dp) } } },
                         )
                         if (modelMenu) {
                             ModelPickerSheet(

@@ -405,7 +405,8 @@ private fun Composer(
         AntonComposer(
             placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
             working = working, sending = sending,
-            model = if (model.isBlank()) "" else Catalog.chipLabel(models, model, reasoning),
+            model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
+            modelIcon = if (model.isBlank()) null else ({ Catalog.find(models, model).let { m -> ModelLogo(m?.id ?: model, m?.vendor, 13.dp) } }),
             onSend = onSend, onStop = onStop,
             onOpenModel = onLoadModels,
             modelPicker = { dismiss ->

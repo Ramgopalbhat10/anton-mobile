@@ -447,6 +447,7 @@ fun SelectChip(
     open: Boolean = false,
     mono: Boolean = false,
     chevron: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(7.dp)
     Row(
@@ -460,6 +461,7 @@ fun SelectChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
+        leading?.invoke()
         icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp)) }
         dot?.let { Box(Modifier.size(6.dp).clip(CircleShape).background(it)) }
         Text(
@@ -594,6 +596,7 @@ fun AntonComposer(
     onStop: () -> Unit,
     onOpenModel: () -> Unit,
     modelPicker: @Composable (dismiss: () -> Unit) -> Unit = {},
+    modelIcon: (@Composable () -> Unit)? = null,
 ) {
     var text by remember { mutableStateOf("") }
     var modelMenu by remember { mutableStateOf(false) }
@@ -628,7 +631,7 @@ fun AntonComposer(
                 if (model.isNotBlank()) {
                     Spacer(Modifier.width(4.dp))
                     Box(Modifier.weight(1f, fill = false)) {
-                        SelectChip(model, onClick = { onOpenModel(); modelMenu = true }, dot = Anton.Accent, open = modelMenu)
+                        SelectChip(model, onClick = { onOpenModel(); modelMenu = true }, dot = if (modelIcon == null) Anton.Accent else null, open = modelMenu, leading = modelIcon)
                         if (modelMenu) modelPicker { modelMenu = false }
                     }
                 }

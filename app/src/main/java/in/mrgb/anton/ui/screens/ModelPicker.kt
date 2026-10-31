@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
+import `in`.mrgb.anton.ui.theme.Logos
 import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
 
@@ -127,18 +128,31 @@ object Catalog {
         )
     }
 
-    /** What the composer chip says: the model's short name, and its effort when it reasons. */
-    fun chipLabel(models: List<ModelDto>, id: String, reasoning: String?): String {
-        val m = models.firstOrNull { it.id == id }
-        val name = m?.let(::shortName) ?: id.substringAfterLast('/')
-        val level = effective(m, reasoning)
-        val extra = listOfNotNull(
-            m?.variant?.context?.uppercase(),
-            if (m?.variant?.fast == true) "Fast" else null,
-            if (m != null && m.reasoning.isNotEmpty() && level != "off") LEVEL_LABEL[level] else null,
-        )
-        return (listOf(name) + extra).joinToString(" · ")
+    /** A model by id, also when the id carries variant tags the catalog doesn't list, like `gpt-6.1-terra[872k][fast]`. */
+    fun find(models: List<ModelDto>, id: String): ModelDto? {
+        val bare = id.replace(Regex("(\\[[^\\]]*\\])+$"), "")
+        return models.firstOrNull { it.id == id } ?: models.firstOrNull { it.id == bare }
+            ?: models.firstOrNull { it.id.substringAfterLast('/') == bare.substringAfterLast('/') && it.variant == null }
     }
+
+    /** "gpt-6.1-terra" → "GPT-6.1 Terra", for a model the catalog doesn't know. */
+    fun prettyId(id: String): String {
+        val words = id.substringAfterLast('/').replace(Regex("(\\[[^\\]]*\\])+$"), "").split('-').filter { it.isNotBlank() }
+        val out = mutableListOf<String>()
+        for (w in words) {
+            val first = w.first()
+            when {
+                first.isDigit() && out.isNotEmpty() && out.last().all { it.isUpperCase() || it.isDigit() } -> out[out.lastIndex] = out.last() + "-" + w
+                w.lowercase() in setOf("gpt", "glm", "o1", "o3", "o4") -> out += w.uppercase()
+                else -> out += w.replaceFirstChar { it.uppercase() }
+            }
+        }
+        return out.joinToString(" ").ifBlank { id }
+    }
+
+    /** What the composer chip says: the model's name only, like "GPT-6.1 Terra". */
+    fun chipLabel(models: List<ModelDto>, id: String): String =
+        find(models, id)?.let { m -> shortName(optionsOf(models, m).base) } ?: prettyId(id)
 }
 
 /**
@@ -230,7 +244,7 @@ fun ModelPicker(
             shown.groupBy { it.vendor ?: it.provider ?: "Other" }.forEach { (vendor, group) ->
                 item(key = "v-$vendor") {
                     Row(Modifier.padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(Catalog.vendorHue(vendor)))
+                        group.first().let { ModelLogo(it.id, it.vendor, 12.dp) }
                         SectionLabel(vendor, group.size, Modifier)
                     }
                 }
@@ -252,6 +266,25 @@ fun ModelPicker(
                 },
             )
         }
+    }
+}
+
+/**
+ * The model's vendor logo (the web's LobeHub set); a one-colour logo takes
+ * the text colour. A vendor without one gets its initial on its hue.
+ */
+@Composable
+fun ModelLogo(id: String, vendor: String?, size: androidx.compose.ui.unit.Dp = 14.dp) {
+    val logo = remember(id, vendor) { Logos.forModel(id, vendor) }
+    when {
+        logo == null -> {
+            val name = vendor?.ifBlank { null } ?: Logos.slugOf(id)
+            Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(Catalog.vendorHue(name).copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+                Text(name.take(1).uppercase(), style = Type.SmallMedium.copy(fontSize = (size.value * 0.6f).sp, lineHeight = (size.value * 0.7f).sp), color = Catalog.vendorHue(name), maxLines = 1)
+            }
+        }
+        logo.mono -> Icon(logo.vector, vendor, tint = Anton.TextPrimary, modifier = Modifier.size(size))
+        else -> androidx.compose.foundation.Image(androidx.compose.ui.graphics.vector.rememberVectorPainter(logo.vector), vendor, Modifier.size(size))
     }
 }
 
@@ -284,6 +317,10 @@ private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        val tile = RoundedCornerShape(8.dp)
+        Box(Modifier.size(30.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
+            ModelLogo(m.id, m.vendor, 16.dp)
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(Catalog.shortName(m), style = Type.BodyMedium, color = if (on) Anton.AccentHover else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
@@ -321,7 +358,7 @@ private fun OptionsPanel(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Catalog.vendorHue(model.vendor ?: "")))
+            ModelLogo(model.id, model.vendor, 18.dp)
             Text(Catalog.shortName(model), style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Badge(Catalog.sourceOf(model), if (model.subscription != null) Tone.Accent else Tone.Neutral)
         }

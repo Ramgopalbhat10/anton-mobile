@@ -55,6 +55,8 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     init {
         refresh()
         viewModelScope.launch { runCatching { repo.api.sessionReasoning(sessionId) }.onSuccess { reasoning.value = it } }
+        // The composer chip names the model from the catalog, so load it up front.
+        loadModels()
         viewModelScope.launch {
             repo.changes.collect { e ->
                 if (e.name.startsWith("task") && e.data?.contains(sessionId) == true) refresh()
@@ -138,6 +140,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     }
 
     fun open(id: String) = viewModelScope.launch {
+        loadModels()
         runCatching { repo.space(id) }.onSuccess { _detail.value = it; coordinatorModel.value = it.coordinatorModel; coordinatorReasoning.value = it.coordinatorReasoning }
         runCatching { repo.sessions() }.onSuccess { list -> _threads.value = list.filter { it.spaceId == id } }
         refreshCoordinator(id)
