@@ -69,7 +69,7 @@ fun ThreadScreen(
                 s?.let {
                     StateGlyph(it.glyph())
                     Spacer(Modifier.width(8.dp))
-                    Text(it.title.ifBlank { "Untitled" }, style = Type.BodyMedium.copy(fontSize = 14.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(it.title.ifBlank { "Untitled" }, style = Type.BodyMedium.copy(fontSize = 15.5.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     Spacer(Modifier.width(8.dp))
                     Text(it.glyph().label, style = Type.Meta, color = Anton.TextTertiary, maxLines = 1)
                 }
@@ -153,17 +153,17 @@ internal fun mdPadding() = com.mikepenz.markdown.model.markdownPadding(block = 6
 /** The transcript's Markdown type; `small` for the words between steps in a work card. */
 @Composable
 internal fun mdType(small: Boolean = false): com.mikepenz.markdown.model.MarkdownTypography {
-    val body = if (small) Type.Small.copy(fontSize = 12.5.sp, lineHeight = 19.sp) else Type.Body.copy(lineHeight = 20.sp)
+    val body = if (small) Type.Small.copy(fontSize = 13.5.sp, lineHeight = 21.sp) else Type.Body.copy(lineHeight = 22.sp)
     return markdownTypography(
         text = body,
         h1 = Type.Heading,
-        h2 = Type.BodyMedium.copy(fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+        h2 = Type.BodyMedium.copy(fontSize = 15.5.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
         h3 = Type.BodyMedium,
         h4 = Type.BodyMedium,
         h5 = Type.BodyMedium,
         h6 = Type.BodyMedium,
         code = Type.Code,
-        inlineCode = Type.Code.copy(fontSize = 12.sp),
+        inlineCode = Type.Code.copy(fontSize = 13.sp),
         list = body,
         bullet = body,
         quote = body.copy(color = Anton.TextSecondary),
@@ -194,7 +194,7 @@ fun UserMessage(m: MessageDto) {
                     .border(1.dp, Anton.CardBorder, shape)
                     .padding(horizontal = 15.dp, vertical = 11.dp),
             ) {
-                Text(split.text, style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
+                Text(split.text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextPrimary)
             }
         }
     }
@@ -251,7 +251,7 @@ fun ThreadCard(p: PartDto) {
                 p.text?.let { Markdown(it, colors = mdColors(), typography = mdType(), padding = mdPadding()) }
                 p.question?.let {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Lucide.CircleHelp, null, tint = Anton.Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
+                        Icon(Lucide.CircleHelp, null, tint = Anton.Warning, modifier = Modifier.size(14.dp).padding(top = 2.dp))
                         Text(it, style = Type.Small, color = Anton.WarningText)
                     }
                 }
@@ -281,7 +281,7 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
             Box(
                 Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(13.dp)) }
+            ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -302,7 +302,7 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
                 val ok = runs.count { it.status == "passed" }
                 val bad = runs.count { it.status == "failed" }
                 if (runs.isNotEmpty()) {
-                    Icon(if (bad > 0) Lucide.X else Lucide.Check, null, tint = if (bad > 0) Anton.Danger else Anton.Success, modifier = Modifier.size(12.dp))
+                    Icon(if (bad > 0) Lucide.X else Lucide.Check, null, tint = if (bad > 0) Anton.Danger else Anton.Success, modifier = Modifier.size(13.dp))
                     Text("$ok/${runs.size} checks" + if (bad > 0) " · $bad failed" else "", style = Type.Meta, color = if (bad > 0) Anton.DangerText else Anton.TextTertiary)
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         runs.take(8).forEach { run ->
@@ -334,9 +334,9 @@ private fun AskCard(p: PartDto) {
             Box(
                 Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
+            ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f)) {
-                Text(p.question.orEmpty(), style = Type.BodyMedium.copy(lineHeight = 20.sp), color = Anton.TextPrimary)
+                Text(p.question.orEmpty(), style = Type.BodyMedium.copy(lineHeight = 22.sp), color = Anton.TextPrimary)
                 Text(
                     if (answered) "Answered" else if (p.options.isEmpty()) "Answer below to reply" else "Pick an answer, or reply below",
                     style = Type.Meta, color = Anton.TextTertiary,
@@ -363,10 +363,10 @@ private fun AskCard(p: PartDto) {
                                 .border(1.dp, if (on) Color.Transparent else Anton.BorderDefault, RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (on) Icon(Lucide.Check, null, tint = Anton.AccentFg, modifier = Modifier.size(12.dp))
-                            else Text("${i + 1}", style = Type.Num.copy(fontSize = 10.5.sp), color = Anton.TextTertiary)
+                            if (on) Icon(Lucide.Check, null, tint = Anton.AccentFg, modifier = Modifier.size(13.dp))
+                            else Text("${i + 1}", style = Type.Num.copy(fontSize = 11.5.sp), color = Anton.TextTertiary)
                         }
-                        Text(opt.label, style = Type.Body.copy(fontSize = 12.5.sp, lineHeight = 18.sp), color = Anton.TextPrimary, modifier = Modifier.weight(1f))
+                        Text(opt.label, style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 20.sp), color = Anton.TextPrimary, modifier = Modifier.weight(1f))
                         val hint = opt.hint ?: if (i == recommended) "recommended" else null
                         hint?.let { Text(it, style = Type.Meta, color = Anton.TextDisabled, maxLines = 1) }
                     }
@@ -390,7 +390,7 @@ private fun QueuedNote(text: String) {
         val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
         Box(
             Modifier.clip(shape).border(1.dp, Anton.BorderDefault, shape).padding(horizontal = 15.dp, vertical = 11.dp),
-        ) { Text(text, style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+        ) { Text(text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(4.dp).clip(CircleShape).background(Anton.N500))
             Text("Queued — joins when this turn finishes", style = Type.Meta, color = Anton.TextDisabled)

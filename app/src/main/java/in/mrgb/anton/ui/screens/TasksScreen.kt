@@ -207,7 +207,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
             )
             s.pullRequest?.let { pr ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(11.dp))
+                    Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(12.dp))
                     Text("#${s.prUrl?.substringAfterLast('/') ?: ""}", style = Type.Meta.copy(fontSize = Type.Num.fontSize), color = Anton.SuccessText, maxLines = 1)
                 }
                 if (pr.runs.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -240,7 +240,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
 @Composable
 private fun Fact(icon: ImageVector?, text: String, mono: Boolean = false, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(11.dp)) }
+        icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp)) }
         Text(
             text, maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = if (mono) Type.Num else Type.Meta,
@@ -261,7 +261,7 @@ fun Fab(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .background(if (pressed) Anton.AccentPressed else Anton.Accent)
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(Lucide.Plus, "New task", tint = Anton.AccentFg, modifier = Modifier.size(20.dp)) }
+    ) { Icon(Lucide.Plus, "New task", tint = Anton.AccentFg, modifier = Modifier.size(22.dp)) }
 }
 
 /** Icon-only tab bar; the selected tab gets the accent and a short accent rule above it. */
@@ -283,7 +283,7 @@ fun BottomBar(selected: Int, onNav: (Int) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (on) Box(Modifier.align(Alignment.TopCenter).padding(top = 0.dp).size(width = 18.dp, height = 2.dp).clip(RoundedCornerShape(1.dp)).background(Anton.Accent))
-                Icon(icon, label, tint = if (on) Anton.Accent else Anton.IconDisabled, modifier = Modifier.size(20.dp))
+                Icon(icon, label, tint = if (on) Anton.Accent else Anton.IconDisabled, modifier = Modifier.size(22.dp))
             }
         }
     }

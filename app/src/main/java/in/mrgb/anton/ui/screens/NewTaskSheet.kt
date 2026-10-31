@@ -69,12 +69,12 @@ fun NewTaskSheet(
             BasicTextField(
                 value = prompt, onValueChange = { prompt = it },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 80.dp).focusRequester(focus),
-                textStyle = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp, color = Anton.TextPrimary),
+                textStyle = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp, color = Anton.TextPrimary),
                 cursorBrush = SolidColor(Anton.Accent),
                 maxLines = 10,
                 interactionSource = interaction,
                 decorationBox = { inner ->
-                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp), color = Anton.TextTertiary)
+                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp), color = Anton.TextTertiary)
                     inner()
                 },
             )

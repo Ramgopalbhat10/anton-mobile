@@ -230,7 +230,7 @@ fun ModelPicker(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Lucide.ListFilter, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
+            Icon(Lucide.ListFilter, null, tint = Anton.IconTertiary, modifier = Modifier.size(15.dp))
             Catalog.Filter.entries.forEach { f ->
                 Pill(f.label, null, on = f in filters, icon = f.icon, check = true) { filters = if (f in filters) filters - f else filters + f }
             }
@@ -345,9 +345,9 @@ fun ModelFacts(models: List<ModelDto>, id: String, reasoning: String?) {
         if (opts.contexts.size > 1) {
             val tag = m.variant?.context
             val tokens = opts.contexts.firstOrNull { it.first == tag }?.second ?: base.contextLength
-            Text(Catalog.tokens(tokens), style = Type.Num.copy(fontSize = 10.5.sp), color = Anton.TextTertiary, maxLines = 1)
+            Text(Catalog.tokens(tokens), style = Type.Num.copy(fontSize = 11.5.sp), color = Anton.TextTertiary, maxLines = 1)
         }
-        if (m.variant?.fast == true) Icon(Lucide.Zap, "Fast", tint = Anton.Warning, modifier = Modifier.size(11.dp))
+        if (m.variant?.fast == true) Icon(Lucide.Zap, "Fast", tint = Anton.Warning, modifier = Modifier.size(12.dp))
     }
 }
 
@@ -362,7 +362,7 @@ private fun InitialTile(name: String, size: androidx.compose.ui.unit.Dp) {
 private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = null, check: Boolean = false, leading: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
-        Modifier.height(30.dp).clip(shape)
+        Modifier.height(32.dp).clip(shape)
             .background(if (on) Anton.AccentBg else Anton.InputBg)
             .border(1.dp, if (on) Anton.AccentBorder else Anton.Input, shape)
             .clickable(role = Role.Checkbox, onClick = onClick)
@@ -371,10 +371,10 @@ private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = n
     ) {
         val tint = if (on) Anton.AccentHover else Anton.IconTertiary
         leading?.invoke()
-        if (check && on) Icon(Lucide.Check, null, tint = tint, modifier = Modifier.size(12.dp))
-        else icon?.let { Icon(it, null, tint = tint, modifier = Modifier.size(12.dp)) }
+        if (check && on) Icon(Lucide.Check, null, tint = tint, modifier = Modifier.size(13.dp))
+        else icon?.let { Icon(it, null, tint = tint, modifier = Modifier.size(13.dp)) }
         Text(label, style = Type.SmallMedium, color = if (on) Anton.AccentHover else Anton.TextSecondary, maxLines = 1)
-        count?.let { Text("$it", style = Type.Num.copy(fontSize = 10.5.sp), color = if (on) Anton.Accent else Anton.TextDisabled) }
+        count?.let { Text("$it", style = Type.Num.copy(fontSize = 11.5.sp), color = if (on) Anton.Accent else Anton.TextDisabled) }
     }
 }
 
@@ -396,9 +396,9 @@ private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(Catalog.shortName(m), style = Type.BodyMedium, color = if (on) Anton.AccentHover else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (m.reasoning.isNotEmpty()) Icon(Lucide.Brain, "Reasons", tint = Anton.IconDisabled, modifier = Modifier.size(12.dp))
-                if (m.vision) Icon(Lucide.Eye, "Sees images", tint = Anton.IconDisabled, modifier = Modifier.size(12.dp))
-                if (current) Text("current", style = Type.Meta.copy(fontSize = 10.5.sp), color = Anton.TextDisabled)
+                if (m.reasoning.isNotEmpty()) Icon(Lucide.Brain, "Reasons", tint = Anton.IconDisabled, modifier = Modifier.size(13.dp))
+                if (m.vision) Icon(Lucide.Eye, "Sees images", tint = Anton.IconDisabled, modifier = Modifier.size(13.dp))
+                if (current) Text("current", style = Type.Meta.copy(fontSize = 11.5.sp), color = Anton.TextDisabled)
             }
             val price = if (m.subscription != null) m.subscription else if (m.price.input == 0.0 && m.price.output == 0.0) "Free" else "${Catalog.dollars(m.price.input)} / ${Catalog.dollars(m.price.output)}"
             Text(
@@ -408,7 +408,7 @@ private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> 
         }
         if (m.contextLength > 0) Text(Catalog.tokens(m.contextLength), style = Type.Num, color = Anton.TextTertiary)
         Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-            if (on) Icon(Lucide.Check, "Chosen", tint = Anton.Accent, modifier = Modifier.size(15.dp))
+            if (on) Icon(Lucide.Check, "Chosen", tint = Anton.Accent, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -446,7 +446,7 @@ private fun OptionsPanel(
         }
         if (opts.fast) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Lucide.Zap, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp))
+                Icon(Lucide.Zap, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Fast mode", style = Type.SmallMedium, color = Anton.TextPrimary)
                     Text("Quicker answers on the same model, billed higher", style = Type.Meta, color = Anton.TextTertiary)
@@ -462,7 +462,7 @@ private fun OptionsPanel(
 private fun OptionRow(label: String, icon: ImageVector, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp))
+            Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp))
             Text(label.uppercase(), style = Type.MonoLabel, color = Anton.TextTertiary)
         }
         content()
@@ -481,12 +481,12 @@ private fun <T> Segments(options: List<Pair<T, String>>, selected: T, onSelect: 
             val on = value == selected
             val shape = RoundedCornerShape(7.dp)
             Box(
-                Modifier.weight(1f).height(32.dp).clip(shape)
+                Modifier.weight(1f).height(34.dp).clip(shape)
                     .then(if (on) Modifier.background(Brush.verticalGradient(listOf(Anton.N700, Anton.N750))).border(1.dp, Anton.BorderDefault, shape) else Modifier)
                     .clickable(role = Role.Tab) { onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = Type.SmallMedium.copy(fontSize = 11.5.sp), color = if (on) Anton.TextPrimary else Anton.TextTertiary, maxLines = 1)
+                Text(label, style = Type.SmallMedium.copy(fontSize = 12.5.sp), color = if (on) Anton.TextPrimary else Anton.TextTertiary, maxLines = 1)
                 if (markDefault && value == default) Box(Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp).size(3.dp).clip(CircleShape).background(if (on) Anton.Accent else Anton.N500))
             }
         }

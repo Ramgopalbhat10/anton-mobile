@@ -164,18 +164,18 @@ fun MenuItem(
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         val fg = if (destructive) Anton.DangerText else Anton.TextPrimary
-        icon?.let { Icon(it, null, tint = if (destructive) Anton.Danger else Anton.IconTertiary, modifier = Modifier.size(15.dp)) }
+        icon?.let { Icon(it, null, tint = if (destructive) Anton.Danger else Anton.IconTertiary, modifier = Modifier.size(16.dp)) }
         Column(Modifier.weight(1f)) {
             Text(
                 text,
-                style = if (mono) Type.Num.copy(fontSize = 12.sp) else Type.Body,
+                style = if (mono) Type.Num.copy(fontSize = 13.sp) else Type.Body,
                 color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             hint?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
         trailingText?.let { Text(it, style = Type.Num, color = Anton.TextDisabled, maxLines = 1) }
         Box(Modifier.size(15.dp), contentAlignment = Alignment.Center) {
-            if (checked) Icon(Lucide.Check, "Selected", tint = Anton.Accent, modifier = Modifier.size(15.dp))
+            if (checked) Icon(Lucide.Check, "Selected", tint = Anton.Accent, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -184,7 +184,7 @@ fun MenuItem(
 @Composable
 fun MenuLabel(text: String, count: Int? = null) {
     Row(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text.uppercase(), style = Type.MonoLabel.copy(fontSize = 10.sp), color = Anton.TextDisabled)
+        Text(text.uppercase(), style = Type.MonoLabel.copy(fontSize = 11.sp), color = Anton.TextDisabled)
         count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
     }
 }

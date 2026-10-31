@@ -63,18 +63,20 @@ Geist and Geist Mono, variable TTFs, Latin subset (OFL, `licenses/`).
 
 | Style | Size / line height | Weight | Use |
 |---|---|---|---|
-| `Title` | 16 / 22 | SemiBold | App bar titles |
-| `Heading` | 15 / 20 | SemiBold | Sheet titles, h1 in replies |
-| `BodyLarge` | 14 / 22 | Regular | Prominent body text |
-| `Body` / `BodyMedium` | 13 / 19 | Regular / Medium | Default text, row titles |
-| `Small` / `SmallMedium` | 12 / 16 | Regular / Medium | Secondary lines, chips |
-| `Meta` | 11.5 / 17 | Regular | Subtitles, captions |
-| `MonoLabel` | 10.5 / 16, uppercase, tracked | Medium, mono | Section labels |
-| `Num` | 11 / 16 | Mono | Ages, counts, token sizes |
-| `Code` | 12 / 18 | Mono | Code blocks |
+| `Title` | 18 / 24 | SemiBold | App bar titles |
+| `Heading` | 17 / 22 | SemiBold | Sheet titles, h1 in replies |
+| `BodyLarge` | 15.5 / 24 | Regular | Prominent body text |
+| `Body` / `BodyMedium` | 14.5 / 21 | Regular / Medium | Default text, row titles |
+| `Small` / `SmallMedium` | 13.5 / 19 | Regular / Medium | Secondary lines, chips |
+| `Meta` | 12.5 / 19 | Regular | Subtitles, captions |
+| `MonoLabel` | 11.5 / 18, uppercase, tracked | Medium, mono | Section labels |
+| `Num` | 12 / 18 | Mono | Ages, counts, token sizes |
+| `Code` | 13 / 20 | Mono | Code blocks |
 
-Markdown replies use `Body` at 13/20 with 6dp between blocks (`mdPadding()`
-in `ThreadScreen.kt`). Text between work-card steps uses 12.5/19.
+Markdown replies use `Body` at 14.5/22 with 6dp between blocks (`mdPadding()`
+in `ThreadScreen.kt`). Text between work-card steps uses 13.5/21.
+
+The scale is sized for phones: the web's 13px body reads small on a handset, so the app runs every step about 1–1.5sp larger than the web while keeping the same hierarchy.
 
 ## Spacing
 
@@ -107,7 +109,7 @@ numbers.
 | User bubble | 15 × 11 padding, 8 above its attachment chips |
 | Work card | 44 header, 14 side padding; step rows 30 high with 3 between |
 | Ask / plan card | 16 padding, 12 icon → text, option rows ≥ 44 high, 6 between options |
-| Composer | 14 from the screen edge, 8 above, 12 below; input 16 × 14, toolbar 10 |
+| Composer | 14 from the screen edge, 8 above, 12 below; input 16 × 14, toolbar 10, 34 send button |
 | Model picker | 12 between filter pills, 18 above a vendor group, model rows 12 × 11 with a 32 logo tile |
 | Bottom sheet | 20 side padding, 16 below the header |
 | Menu item | min height 38, 10 × 8 padding |
@@ -138,12 +140,12 @@ shadcn equivalents in brackets.
 - **AntonCard** [Card] — gradient fill, hairline border, 14 radius.
 - **AntonWell** — inset container for code, tool output, subagent detail.
 - **AntonButton** [Button] — `Primary`, `Outline`, `Secondary`, `Ghost`,
-  `Destructive`; sizes `Sm` 28, `Md` 34, `Lg` 40. `GhostIconButton` for bars.
-- **AntonInput** / **Field** [Input + Label] — focus ring in `Ring`, optional
+  `Destructive`; sizes `Sm` 32, `Md` 38, `Lg` 44. `GhostIconButton` (36, 20 icon) for bars.
+- **AntonInput** / **Field** [Input + Label] — 40 min height, focus ring in `Ring`, optional
   leading icon and trailing slot.
-- **SelectChip** [Select trigger] — 28 high, `leading`/`trailing` slots
+- **SelectChip** [Select trigger] — 32 high, `leading`/`trailing` slots
   (the composer's model chip puts the logo and effort/context/fast facts there).
-- **Segmented** [Tabs] — in a well, with counts.
+- **Segmented** [Tabs] — 32 high, in a well, with counts.
 - **Badge**, **SectionLabel**, **StateGlyph** (task state icons), **ListRow**.
 - **AntonDropdown** / **MenuItem** / **MenuLabel** / **MenuSeparator**
   [DropdownMenu], **AntonSelect** [Combobox], **AntonSheet** [Drawer].
@@ -158,7 +160,7 @@ shadcn equivalents in brackets.
 ## Icons and logos
 
 - **Icons**: lucide (ISC), the same set the web uses, as `ImageVector`s built
-  from lucide's own path data in `Lucide.kt`. 1.5–2 stroke, sizes 13–20.
+  from lucide's own path data in `Lucide.kt`. 1.5–2 stroke, sizes 12–22 (14–16 inline with text, 20–22 in bars).
   Add an icon by copying its path data from `lucide-static`; don't pull in an
   icon library.
 - **Logos**: LobeHub icons (MIT), converted with Android's `Svg2Vector` into

@@ -57,7 +57,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
                         contentAlignment = Alignment.Center,
                     ) {
                         if (space.icon.isNotBlank() && space.icon.length <= 4) Text(space.icon, style = Type.Body)
-                        else Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp))
+                        else Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(16.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(space.name.ifBlank { space.id }, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -68,7 +68,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
                     }
                     if (live) Box(Modifier.size(6.dp).clip(CircleShape).background(Anton.Accent))
                     Text("${space.counts.values.sum()}", style = Type.Num, color = Anton.TextDisabled)
-                    Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(14.dp))
+                    Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(15.dp))
                 }
             }
             if (spaces.isEmpty() && error == null) item { EmptyState(Lucide.Folder, "No projects yet", "Create a project on the web to group threads.") }
@@ -89,7 +89,7 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
             subtitle = space?.let { s -> listOfNotNull(s.repoIds.size.takeIf { it > 0 }?.let { "$it repos" }, s.countsLine()).joinToString(" · ") },
             onBack = onBack,
             divider = true,
-            leading = { Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(2.dp)) },
+            leading = { Icon(Lucide.Folder, null, tint = Anton.IconSecondary, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(2.dp)) },
         )
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(vertical = 18.dp)) {
@@ -99,7 +99,7 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
                         Box(
                             Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
                             contentAlignment = Alignment.Center,
-                        ) { Icon(Lucide.Sparkles, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
+                        ) { Icon(Lucide.Sparkles, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
                         Column(Modifier.weight(1f)) {
                             Text("Coordinator", style = Type.BodyMedium, color = Anton.TextPrimary)
                             Text("Watching ${threads.size} threads", style = Type.Meta, color = Anton.TextTertiary)
