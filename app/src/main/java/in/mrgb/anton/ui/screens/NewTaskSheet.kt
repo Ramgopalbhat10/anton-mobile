@@ -71,7 +71,7 @@ fun NewTaskSheet(
                 },
             )
             Row(
-                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 // Repo chip → dropdown
@@ -79,14 +79,18 @@ fun NewTaskSheet(
                     SheetChip(Icons.Outlined.Folder, repos.firstOrNull { it.first == repo }?.second?.substringAfterLast('/') ?: "Chat", true) { repoMenu = true }
                     DropdownMenu(
                         expanded = repoMenu, onDismissRequest = { repoMenu = false },
-                        modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 300.dp),
+                        modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp)).heightIn(max = 280.dp),
+                        containerColor = Anton.Overlay,
+                        shadowElevation = 8.dp,
                     ) {
                         DropdownMenuItem(
+                            modifier = Modifier.height(30.dp),
                             text = { Text("Chat (no repo)", style = Type.Small, color = if (repo == null) Anton.Accent else Anton.TextPrimary) },
                             onClick = { repo = null; branch = null; onRepo(null); repoMenu = false },
                         )
                         repos.forEach { (id, name) ->
                             DropdownMenuItem(
+                                modifier = Modifier.height(30.dp),
                                 text = { Text(name, style = Type.Small, color = if (id == repo) Anton.Accent else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 onClick = { repo = id; branch = null; onRepo(id); repoMenu = false },
                             )
@@ -99,10 +103,13 @@ fun NewTaskSheet(
                         SheetChip(Icons.Outlined.AccountTree, branch ?: defaultBranch ?: "main", true) { branchMenu = true }
                         DropdownMenu(
                             expanded = branchMenu, onDismissRequest = { branchMenu = false },
-                            modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderDefault, RoundedCornerShape(10.dp)).heightIn(max = 300.dp),
+                            modifier = Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(9.dp)).heightIn(max = 280.dp),
+                            containerColor = Anton.Overlay,
+                            shadowElevation = 8.dp,
                         ) {
                             branches.forEach { b ->
                                 DropdownMenuItem(
+                                    modifier = Modifier.height(30.dp),
                                     text = { Text(b, style = Type.Small, color = if (b == branch) Anton.Accent else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     onClick = { branch = b; branchMenu = false },
                                 )
@@ -127,14 +134,7 @@ fun NewTaskSheet(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // Plan toggle sits inline like the web composer's plan chip.
-                Row(
-                    Modifier.clip(RoundedCornerShape(7.dp)).clickable { onPlanFirst(!planFirst) }.padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    AntonSwitch(planFirst, onPlanFirst)
-                    Text("Plan", style = Type.Meta, color = Anton.TextTertiary)
-                }
+                AntonSwitch(planFirst, onPlanFirst)
                 Box(
                     Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
                         .background(if (prompt.isBlank() || creating) Anton.N700 else Anton.Accent)

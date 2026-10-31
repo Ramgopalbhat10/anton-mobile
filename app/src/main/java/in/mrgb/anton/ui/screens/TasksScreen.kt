@@ -162,7 +162,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
                 style = Type.BodyMedium,
                 color = if (s.glyph() == GlyphKind.Resolved || s.glyph() == GlyphKind.Idle) Anton.TextSecondary else Anton.TextPrimary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f),
             )
             s.pullRequest?.let { pr ->
                 Text(
@@ -178,7 +178,6 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
                 }
             }
             if (s.working || s.status == "running") Box(Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Anton.Accent))
-            Spacer(Modifier.weight(1f))
             Text(ageOf(s.createdAt), style = Type.Num, color = Anton.TextDisabled)
         }
         Row(

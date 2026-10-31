@@ -117,10 +117,22 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     }
 
     val coordinatorMessages = MutableStateFlow<List<MessageDto>>(emptyList())
+    val coordinatorModel = MutableStateFlow<String?>(null)
+    val models = MutableStateFlow<List<ModelDto>>(emptyList())
     val sending = MutableStateFlow(false)
 
+    fun loadModels() = viewModelScope.launch {
+        if (models.value.isNotEmpty()) return@launch
+        runCatching { repo.api.models() }.onSuccess { models.value = it.models }
+    }
+
+    fun setCoordinatorModel(spaceId: String, model: String) = viewModelScope.launch {
+        coordinatorModel.value = model
+        runCatching { repo.api.setCoordinatorModel(spaceId, model) }
+    }
+
     fun open(id: String) = viewModelScope.launch {
-        runCatching { repo.space(id) }.onSuccess { _detail.value = it }
+        runCatching { repo.space(id) }.onSuccess { _detail.value = it; coordinatorModel.value = it.coordinatorModel }
         runCatching { repo.sessions() }.onSuccess { list -> _threads.value = list.filter { it.spaceId == id } }
         refreshCoordinator(id)
     }

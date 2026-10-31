@@ -116,6 +116,7 @@ data class SpaceDto(
     // The list endpoint serves threads as a count; the detail endpoint carries the rows.
     @SerialName("threads") val threadCount: Int = 0,
     val counts: Map<String, Int> = emptyMap(),
+    val coordinatorModel: String? = null,
     val updatedAt: String = "",
 )
 

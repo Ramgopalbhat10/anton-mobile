@@ -33,6 +33,10 @@ fun CoordinatorScreen(
     name: String,
     messages: List<MessageDto>,
     sending: Boolean,
+    model: String,
+    models: List<`in`.mrgb.anton.data.api.ModelDto>,
+    onModel: (String) -> Unit,
+    onLoadModels: () -> Unit,
     onSend: (String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -70,28 +74,15 @@ fun CoordinatorScreen(
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Row(
-                Modifier.contentWidth().padding(horizontal = 14.dp, vertical = 10.dp)
-                    .clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp))
-                    .background(Anton.CardBg).padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BasicTextField(
-                    value = draft, onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f),
-                    textStyle = Type.Body.copy(color = Anton.TextPrimary),
-                    cursorBrush = SolidColor(Anton.Accent),
-                    decorationBox = { inner ->
-                        if (draft.isBlank()) Text("Tell the coordinator what $name needs", style = Type.Body, color = Anton.TextTertiary)
-                        inner()
+            Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 6.dp, bottom = 10.dp)) {
+                `in`.mrgb.anton.ui.components.AntonComposer(
+                    placeholder = "Tell the coordinator what $name needs",
+                    working = sending, sending = sending, model = model,
+                    onSend = onSend, onStop = {},
+                    onOpenModel = onLoadModels,
+                    modelPicker = { dismiss ->
+                        ModelPickerSheet(models = models, selected = model, onPick = { dismiss(); onModel(it) }, onDismiss = dismiss)
                     },
-                )
-                Icon(
-                    Icons.Outlined.Send, "Send",
-                    tint = if (draft.isBlank() || sending) Anton.TextDisabled else Anton.Accent,
-                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable(enabled = draft.isNotBlank() && !sending) {
-                        onSend(draft.trim()); draft = ""; focusManager.clearFocus()
-                    }.padding(6.dp),
                 )
             }
         }

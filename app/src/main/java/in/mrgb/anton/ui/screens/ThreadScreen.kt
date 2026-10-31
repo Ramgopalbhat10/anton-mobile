@@ -390,59 +390,17 @@ private fun Composer(
     onSend: (String) -> Unit, onStop: () -> Unit,
     model: String, models: List<ModelDto>, onModel: (String) -> Unit, onLoadModels: () -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
-    var modelMenu by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 6.dp, bottom = 10.dp)) {
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp))
-                .background(Anton.CardBg).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BasicTextField(
-                value = text, onValueChange = { text = it },
-                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-                textStyle = Type.Body.copy(color = Anton.TextPrimary),
-                cursorBrush = SolidColor(Anton.Accent),
-                decorationBox = { inner ->
-                    if (text.isBlank()) Text(
-                        if (working) "Add to what the agent is doing" else "Reply to Anton",
-                        style = Type.Body, color = Anton.TextTertiary,
-                    )
-                    inner()
-                },
-            )
-            if (model.isNotBlank()) {
-                Box {
-                    SheetChip(null, model, true) { onLoadModels(); modelMenu = true }
-                    if (modelMenu) {
-                        ModelPickerSheet(
-                            models = models,
-                            selected = model,
-                            onPick = { modelMenu = false; onModel(it) },
-                            onDismiss = { modelMenu = false },
-                        )
-                    }
-                }
-            }
-            Box(
-                Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
-                    .background(if (working) Anton.Raised else Anton.Accent)
-                    .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
-                    .clickable {
-                        if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
-                    if (working) "Stop" else "Send",
-                    tint = if (working) Anton.Danger else Anton.AccentFg,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
+        AntonComposer(
+            placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
+            working = working, sending = sending, model = model,
+            onSend = onSend, onStop = onStop,
+            onOpenModel = onLoadModels,
+            modelPicker = { dismiss ->
+                ModelPickerSheet(models = models, selected = model, onPick = { dismiss(); onModel(it) }, onDismiss = dismiss)
+            },
+        )
     }
     }
 }

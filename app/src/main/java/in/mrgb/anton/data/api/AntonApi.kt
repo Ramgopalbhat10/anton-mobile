@@ -121,10 +121,14 @@ class AntonApi(private val config: () -> ServerConfig) {
             val parts = (m["parts"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { pel ->
                 val p = pel as? JsonObject ?: return@mapNotNull null
                 val type = p["type"]?.toString()?.trim('"') ?: ""
+                // Coordinator text embeds <thread-reports>/<attachment>-style markup the web hides.
                 val text = p["text"]?.toString()?.let { if (it == "null") null else it.trim('"').replace("\\n", "\n") }
+                    ?.replace(Regex("<attachment[^>]*/?>|<attachment[^>]*>.*?</attachment>", RegexOption.DOT_MATCHES_ALL), "")
+                    ?.replace(Regex("<thread-[a-z-]+[^>]*>.*?</thread-[a-z-]+>|<thread-[a-z-]+[^>]*/?>", RegexOption.DOT_MATCHES_ALL), "")
+                    ?.trim()?.ifBlank { null }
                 val data = (p["input"] ?: p["data"] ?: p) as? JsonObject
                 when {
-                    type == "text" -> PartDto(type = "text", text = text)
+                    type == "text" -> if (text == null) null else PartDto(type = "text", text = text)
                     type == "reasoning" -> PartDto(type = "reasoning", text = text)
                     type == "dynamic-tool" || type.startsWith("tool-") -> PartDto(
                         type = "tool",
@@ -146,6 +150,14 @@ class AntonApi(private val config: () -> ServerConfig) {
             MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = parts)
         }
     }
+
+    /** The web's space PATCH — here it only ever sets the coordinator's model. */
+    suspend fun setCoordinatorModel(spaceId: String, model: String) =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder().url(url("/api/spaces/$spaceId")).withAuth()
+                .patch("""{"coordinatorModel":${json.encodeToString(kotlinx.serialization.serializer(), model)}}""".toRequestBody("application/json".toMediaType())).build()
+            http.newCall(req).execute().use { if (!it.isSuccessful) throw ApiError(it.code, it.body?.string().orEmpty()) }
+        }
 
     /** Message the project's coordinator — the flue admission body, same as a task prompt. */
     suspend fun sendCoordinator(spaceId: String, text: String) = post<JsonObject>(

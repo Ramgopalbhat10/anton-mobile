@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -237,6 +240,65 @@ fun SheetChip(icon: ImageVector?, label: String, arrow: Boolean = false, onClick
         icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(11.dp)) }
         Text(label, style = Type.Meta, color = Anton.TextSecondary, maxLines = 1)
         if (arrow) Icon(Icons.Outlined.KeyboardArrowDown, null, tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
+    }
+}
+
+/**
+ * The shared composer — one row inside a card: text field, model chip at the
+ * right end, send/stop. Used by the thread view and the coordinator view so
+ * both look and behave identically.
+ */
+@Composable
+fun AntonComposer(
+    placeholder: String,
+    working: Boolean,
+    sending: Boolean,
+    model: String,
+    onSend: (String) -> Unit,
+    onStop: () -> Unit,
+    onOpenModel: () -> Unit,
+    modelPicker: @Composable (dismiss: () -> Unit) -> Unit = {},
+) {
+    var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var modelMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Anton.CardBorder, RoundedCornerShape(12.dp))
+            .background(Anton.CardBg).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.text.BasicTextField(
+            value = text, onValueChange = { text = it },
+            modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+            textStyle = Type.Body.copy(color = Anton.TextPrimary),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(Anton.Accent),
+            decorationBox = { inner ->
+                if (text.isBlank()) Text(placeholder, style = Type.Body, color = Anton.TextTertiary)
+                inner()
+            },
+        )
+        if (model.isNotBlank()) {
+            Box {
+                SheetChip(null, model, true) { onOpenModel(); modelMenu = true }
+                if (modelMenu) modelPicker { modelMenu = false }
+            }
+        }
+        Box(
+            Modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
+                .background(if (working) Anton.Raised else Anton.Accent)
+                .then(if (working) Modifier.border(1.dp, Anton.BorderDefault, RoundedCornerShape(7.dp)) else Modifier)
+                .clickable {
+                    if (working) onStop() else if (text.isNotBlank()) { onSend(text); text = ""; focusManager.clearFocus() }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (working) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward,
+                if (working) "Stop" else "Send",
+                tint = if (working) Anton.Danger else Anton.AccentFg,
+                modifier = Modifier.size(14.dp),
+            )
+        }
     }
 }
 

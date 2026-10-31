@@ -132,6 +132,10 @@ private fun App() {
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
+                model = vm.coordinatorModel.collectAsState().value ?: "",
+                models = vm.models.collectAsState().value,
+                onModel = { vm.setCoordinatorModel(s.id, it) },
+                onLoadModels = vm::loadModels,
                 onSend = { vm.sendCoordinator(s.id, it) },
                 onBack = { back.removeLast() },
             )
