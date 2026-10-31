@@ -49,9 +49,14 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val models = _models.asStateFlow()
     val sending = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
+    /** The task's reasoning level, which the facade's session row leaves out. */
+    val reasoning = MutableStateFlow<String?>(null)
 
     init {
         refresh()
+        viewModelScope.launch { runCatching { repo.api.sessionReasoning(sessionId) }.onSuccess { reasoning.value = it } }
+        // The composer chip names the model from the catalog, so load it up front.
+        loadModels()
         viewModelScope.launch {
             repo.changes.collect { e ->
                 if (e.name.startsWith("task") && e.data?.contains(sessionId) == true) refresh()
@@ -92,9 +97,10 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         refresh()
     }
 
-    fun setModel(model: String) = viewModelScope.launch {
-        runCatching { repo.setModel(sessionId, model) }
-            .onSuccess { _bundle.value = _bundle.value?.copy(session = it) }
+    fun setModel(model: String, level: String?) = viewModelScope.launch {
+        reasoning.value = level
+        runCatching { repo.setModel(sessionId, model, level) }
+            .onSuccess { _bundle.value = _bundle.value?.copy(session = it); reasoning.value = it.reasoning ?: level }
             .onFailure { error.value = it.message }
     }
 }
@@ -118,6 +124,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
 
     val coordinatorMessages = MutableStateFlow<List<MessageDto>>(emptyList())
     val coordinatorModel = MutableStateFlow<String?>(null)
+    val coordinatorReasoning = MutableStateFlow<String?>(null)
     val models = MutableStateFlow<List<ModelDto>>(emptyList())
     val sending = MutableStateFlow(false)
 
@@ -126,13 +133,15 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
         runCatching { repo.api.models() }.onSuccess { models.value = it.models }
     }
 
-    fun setCoordinatorModel(spaceId: String, model: String) = viewModelScope.launch {
+    fun setCoordinatorModel(spaceId: String, model: String, reasoning: String?) = viewModelScope.launch {
         coordinatorModel.value = model
-        runCatching { repo.api.setCoordinatorModel(spaceId, model) }
+        coordinatorReasoning.value = reasoning
+        runCatching { repo.api.setCoordinatorModel(spaceId, model, reasoning) }
     }
 
     fun open(id: String) = viewModelScope.launch {
-        runCatching { repo.space(id) }.onSuccess { _detail.value = it; coordinatorModel.value = it.coordinatorModel }
+        loadModels()
+        runCatching { repo.space(id) }.onSuccess { _detail.value = it; coordinatorModel.value = it.coordinatorModel; coordinatorReasoning.value = it.coordinatorReasoning }
         runCatching { repo.sessions() }.onSuccess { list -> _threads.value = list.filter { it.spaceId == id } }
         refreshCoordinator(id)
     }
@@ -195,12 +204,12 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
 
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
-    fun start(projectId: String?, branch: String?, prompt: String, model: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
+    fun start(projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
         creating.value = true
         error.value = null
         val created = runCatching {
             repo.api.createSession(
-                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = prompt.take(200), model = model, planMode = planFirst.value)
+                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = prompt.take(200), model = model, planMode = planFirst.value, reasoning = reasoning)
             )
         }
         val id = created.getOrNull()?.id

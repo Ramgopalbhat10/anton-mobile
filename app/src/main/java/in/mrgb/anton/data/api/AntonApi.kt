@@ -103,89 +103,43 @@ class AntonApi(private val config: () -> ServerConfig) {
     }
 
     /**
-     * Send a message to the task's agent. This endpoint keeps its budget checks
-     * and priming — the mobile facade deliberately doesn't re-implement them.
-     */
-    /** flue's admission shape: POST {kind:"user", body:text} → 202. */
-    /**
      * A project's coordinator conversation, from the same public agent router the
-     * web hits; the flue wire shape is flattened into PartDto like the facade does.
+     * web hits, flattened by [Transcript].
      */
-    suspend fun spaceMessages(spaceId: String): List<MessageDto> {
-        val body = get<JsonObject>("/api/agents/coordinator/$spaceId")
-        val raw = body["messages"] as? kotlinx.serialization.json.JsonArray ?: return emptyList()
-        return raw.mapNotNull { el ->
-            val m = el as? JsonObject ?: return@mapNotNull null
-            val role = m["role"]?.toString()?.trim('"') ?: "assistant"
-            if (role == "system" || m["display"]?.toString()?.contains("diagnostic") == true) return@mapNotNull null
-            val parts = (m["parts"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { pel ->
-                val p = pel as? JsonObject ?: return@mapNotNull null
-                val type = p["type"]?.toString()?.trim('"') ?: ""
-                // Coordinator text embeds <thread-reports>/<attachment>-style markup the web hides.
-                val text = p["text"]?.toString()?.let { if (it == "null") null else it.trim('"').replace("\\n", "\n") }
-                    ?.replace(Regex("<attachment[^>]*/?>|<attachment[^>]*>.*?</attachment>", RegexOption.DOT_MATCHES_ALL), "")
-                    ?.replace(Regex("An image: given with this message.*?cannot see\\.?", RegexOption.DOT_MATCHES_ALL), "")
-                    ?.trim()?.ifBlank { null }
-                val data = (p["input"] ?: p["data"] ?: p) as? JsonObject
-                when {
-                    type == "text" -> if (text == null) null else PartDto(type = "text", text = text)
-                    type == "reasoning" -> PartDto(type = "reasoning", text = text)
-                    type == "dynamic-tool" || type.startsWith("tool-") -> PartDto(
-                        type = "tool",
-                        name = (p["toolName"] ?: p["name"])?.toString()?.trim('"') ?: type.removePrefix("tool-"),
-                        state = p["state"]?.toString()?.trim('"'),
-                        title = (p["title"] ?: p["description"])?.toString()?.trim('"'),
-                    )
-                    type == "file" || type == "data-file" -> PartDto(
-                        type = "file",
-                        path = (p["filename"] ?: p["path"] ?: p["url"])?.toString()?.trim('"'),
-                    )
-                    data?.get("question") != null -> PartDto(
-                        type = "ask",
-                        question = data["question"]?.toString()?.trim('"'),
-                    )
-                    else -> PartDto(type = "raw", text = text)
-                }
-            }
-            // <thread-reports> bodies carry <thread ...>...</thread> elements the
-            // web renders as thread cards — expand them into real parts here.
-            val expanded = parts.flatMap { part ->
-                if (part.type == "text" && part.text.orEmpty().contains("<thread")) threadParts(part.text!!)
-                else listOf(part)
-            }
-            MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = expanded)
-                .takeIf { it.parts.isNotEmpty() }
+    suspend fun spaceMessages(spaceId: String): List<MessageDto> =
+        Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coordinator/$spaceId"))
+
+    /**
+     * A task's conversation as the web reads it (flue's own shape, with tool
+     * call ids, errors and reply durations); the facade's trimmed copy when
+     * the agent router can't be reached.
+     */
+    suspend fun threadMessages(id: String): List<MessageDto> =
+        runCatching { Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
+            .getOrNull()?.takeIf { it.isNotEmpty() } ?: messages(id)
+
+    /** The full session row, for what the facade trims off (its reasoning level). */
+    suspend fun sessionReasoning(id: String): String? =
+        get<JsonObject>("/api/sessions/$id")["reasoning"].str()
+
+    /** Bytes of a file the server holds (a Library output, an attachment), with the auth headers. */
+    suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(if (path.startsWith("http")) path else url(path)).withAuth().header("Accept", "*/*").build()
+        http.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) throw ApiError(res.code, "")
+            res.body?.bytes() ?: ByteArray(0)
         }
     }
 
-    /** <thread id="…" title="…" state="…" asks="…">inner</thread> → a thread card part + any residual text. */
-    private fun threadParts(raw: String): List<PartDto> {
-        val out = mutableListOf<PartDto>()
-        val block = Regex("<thread\\s+([^>]*)>(.*?)</thread>|<thread\\s+([^>]*)/>", RegexOption.DOT_MATCHES_ALL)
-        val attr = Regex("(\\w+)=\"([^\"]*)\"")
-        var rest = raw
-        block.findAll(raw).forEach { m ->
-            val attrs = attr.findAll(m.groupValues[1].ifBlank { m.groupValues[3] }).associate { it.groupValues[1] to it.groupValues[2] }
-            out += PartDto(
-                type = "thread",
-                name = attrs["id"],
-                title = attrs["title"],
-                state = attrs["state"],
-                question = attrs["asks"],
-                text = m.groupValues[2].trim().ifBlank { null },
-            )
-            rest = rest.replace(m.value, "")
-        }
-        rest.replace(Regex("</?thread[a-z-]*[^>]*>"), "").trim().takeIf { it.isNotBlank() }
-            ?.let { out += PartDto(type = "text", text = it) }
-        return out
-    }
-
-    /** The web's space PATCH — here it only ever sets the coordinator's model. */
-    suspend fun setCoordinatorModel(spaceId: String, model: String) =
+    /** The web's space PATCH — here it only ever sets the coordinator's model and reasoning level. */
+    suspend fun setCoordinatorModel(spaceId: String, model: String, reasoning: String? = null) =
         withContext(Dispatchers.IO) {
+            val body = kotlinx.serialization.json.buildJsonObject {
+                put("coordinatorModel", kotlinx.serialization.json.JsonPrimitive(model))
+                put("coordinatorReasoning", reasoning?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+            }.toString()
             val req = Request.Builder().url(url("/api/spaces/$spaceId")).withAuth()
-                .patch("""{"coordinatorModel":${json.encodeToString(kotlinx.serialization.serializer(), model)}}""".toRequestBody("application/json".toMediaType())).build()
+                .patch(body.toRequestBody("application/json".toMediaType())).build()
             http.newCall(req).execute().use { if (!it.isSuccessful) throw ApiError(it.code, it.body?.string().orEmpty()) }
         }
 
@@ -211,10 +165,12 @@ class AntonApi(private val config: () -> ServerConfig) {
 
     suspend fun resumeSession(id: String) = post<JsonObject>("/api/sessions/$id/resume")
 
-    suspend fun updateSession(id: String, model: String? = null, resolved: Boolean? = null): SessionDto =
+    /** [reasoning] is sent only with [setReasoning]: null there means the model's default. */
+    suspend fun updateSession(id: String, model: String? = null, resolved: Boolean? = null, reasoning: String? = null, setReasoning: Boolean = false): SessionDto =
         withContext(Dispatchers.IO) {
             val bodyJson = kotlinx.serialization.json.buildJsonObject {
                 model?.let { put("model", kotlinx.serialization.json.JsonPrimitive(it)) }
+                if (setReasoning) put("reasoning", reasoning?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
                 resolved?.let { put("resolved", kotlinx.serialization.json.JsonPrimitive(it)) }
             }.toString()
             val req = Request.Builder().url(url("/api/sessions/$id")).withAuth()

@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,19 +21,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import `in`.mrgb.anton.ui.components.AntonSheet
+import `in`.mrgb.anton.ui.components.EmptyState
 import `in`.mrgb.anton.ui.components.SectionLabel
 import `in`.mrgb.anton.ui.components.contentWidth
 import `in`.mrgb.anton.ui.screens.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.AntonTheme
-import `in`.mrgb.anton.ui.theme.Type
 import `in`.mrgb.anton.vm.*
 
 /** Flat in-app navigation — this app is a list and a thread, not a stack. */
@@ -53,7 +51,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AntonTheme { Surface(Modifier.fillMaxSize()) { App() } } }
+        val images = (application as AntonApp).images
+        setContent {
+            AntonTheme {
+                Surface(Modifier.fillMaxSize(), color = Anton.Canvas) {
+                    `in`.mrgb.anton.ui.components.MediaHost(images) { App() }
+                }
+            }
+        }
     }
 }
 
@@ -129,12 +134,14 @@ private fun App() {
         is Screen.Coordinator -> {
             val vm = projectsVm(app)
             CoordinatorScreen(
+                spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 model = vm.coordinatorModel.collectAsState().value ?: "",
+                reasoning = vm.coordinatorReasoning.collectAsState().value,
                 models = vm.models.collectAsState().value,
-                onModel = { vm.setCoordinatorModel(s.id, it) },
+                onModel = { model, level -> vm.setCoordinatorModel(s.id, model, level) },
                 onLoadModels = vm::loadModels,
                 onSend = { vm.sendCoordinator(s.id, it) },
                 onBack = { back.removeLast() },
@@ -147,6 +154,7 @@ private fun App() {
                 bundle = vm.bundle.collectAsState().value,
                 messages = vm.messages.collectAsState().value,
                 models = vm.models.collectAsState().value,
+                reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 onBack = { back.removeLast() },
@@ -187,11 +195,7 @@ private fun App() {
 
     if (newTask) {
         val vm = newTaskVm(app)
-        ModalBottomSheet(
-            onDismissRequest = { newTask = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Anton.Raised,
-        ) {
+        AntonSheet(onDismiss = { newTask = false }, title = "New task") {
             NewTaskSheet(
                 repos = vm.repos.collectAsState().value,
                 branches = vm.branches.collectAsState().value,
@@ -201,8 +205,8 @@ private fun App() {
                 creating = vm.creating.collectAsState().value,
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
-                onStart = { pid, branch, prompt, model ->
-                    vm.start(pid, branch, prompt, model) { id ->
+                onStart = { pid, branch, prompt, model, reasoning ->
+                    vm.start(pid, branch, prompt, model, reasoning) { id ->
                         newTask = false
                         if (id != null) push(Screen.Thread(id))
                     }
@@ -214,7 +218,6 @@ private fun App() {
 }
 
 /** Activity: every session, most recently touched first — same row anatomy as Tasks. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActivityScreen(
     sessions: List<`in`.mrgb.anton.data.api.SessionDto>,
@@ -224,21 +227,16 @@ private fun ActivityScreen(
     onNav: (Int) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
-            Text("Activity", style = Type.Title, color = Anton.TextPrimary)
-        }
+        AppBar("Activity")
         val recent = sessions.sortedByDescending { it.resolvedAt ?: it.pinnedAt ?: it.createdAt }
-        var refreshing by remember { mutableStateOf(false) }
-        LaunchedEffect(refreshing) {
-            if (refreshing) { onRefresh(); kotlinx.coroutines.delay(700); refreshing = false }
-        }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.fillMaxWidth()) {
-            LazyColumn(Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                item { SectionLabel("Recent", recent.size) }
-                items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
+            AntonRefreshBox(onRefresh, Modifier.contentWidth().fillMaxHeight()) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                    item { SectionLabel("Recent", recent.size, Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) }
+                    items(recent.take(40), key = { it.id }) { s -> TaskRow(s, onOpen) }
+                    if (recent.isEmpty()) item { EmptyState(`in`.mrgb.anton.ui.theme.Lucide.History, "No activity yet", "Tasks you start show up here.") }
+                }
             }
-        }
         }
         BottomBar(tabIndex, onNav)
     }

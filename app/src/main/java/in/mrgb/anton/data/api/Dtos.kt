@@ -15,6 +15,8 @@ data class SessionDto(
     val branch: String = "",
     val baseBranch: String = "",
     val model: String = "",
+    /** The task's reasoning level; null runs the model's default. The facade leaves it out, /api/sessions/:id has it. */
+    val reasoning: String? = null,
     val status: String = "stopped",
     val working: Boolean = false,
     val workspace: Boolean = false,
@@ -53,15 +55,33 @@ data class SessionsResponse(val sessions: List<SessionDto> = emptyList())
 @Serializable
 data class WaitingMessageDto(val id: String = "", val text: String = "", val at: String = "")
 
+/** One piece of work handed to a subagent (src/services/subagents.ts): its brief, steps and answer. */
 @Serializable
 data class SubagentRunDto(
     val id: String = "",
+    val agent: String = "",
+    val prompt: String = "",
+    val description: String? = null,
+    val toolCallId: String? = null,
     val title: String? = null,
     val status: String = "",
+    val startedAt: String? = null,
     val durationMs: Long? = null,
     val tokens: Long? = null,
+    val calls: Int = 0,
     val model: String? = null,
-    val steps: List<JsonObject> = emptyList(),
+    val steps: List<SubagentStepDto> = emptyList(),
+    val writing: String? = null,
+    val result: String? = null,
+)
+
+@Serializable
+data class SubagentStepDto(
+    val id: String = "",
+    val tool: String = "",
+    val input: JsonElement? = null,
+    val state: String = "done",
+    val durationMs: Long? = null,
 )
 
 /** One bundled read for the thread screen: GET /api/mobile/sessions/:id. */
@@ -82,6 +102,8 @@ data class MessageDto(
     val at: JsonElement? = null,
     val joined: Boolean = false,
     val parts: List<PartDto> = emptyList(),
+    /** How long the reply took (flue's message metadata); only on the raw conversation. */
+    val durationMs: Long? = null,
 )
 
 @Serializable
@@ -97,6 +119,14 @@ data class PartDto(
     val recommended: JsonElement? = null,
     val answer: JsonElement? = null,
     val hint: String? = null,
+    /** Tool calls: what was called with, what came back, and how it failed. */
+    val input: JsonElement? = null,
+    val output: JsonElement? = null,
+    val toolCallId: String? = null,
+    val errorText: String? = null,
+    /** File parts: where the bytes are (often a data: URL) and their type. */
+    val url: String? = null,
+    val mediaType: String? = null,
 )
 
 @Serializable
@@ -117,6 +147,7 @@ data class SpaceDto(
     @SerialName("threads") val threadCount: Int = 0,
     val counts: Map<String, Int> = emptyMap(),
     val coordinatorModel: String? = null,
+    val coordinatorReasoning: String? = null,
     val updatedAt: String = "",
 )
 
@@ -126,8 +157,33 @@ data class SpacesResponse(val spaces: List<SpaceDto> = emptyList())
 /** /spaces/:id returns the space object itself; thread rows come from sessions filtered by spaceId. */
 typealias SpaceDetailDto = SpaceDto
 
+/** The web's ModelInfo (src/web/lib/api.ts): the catalog row the picker filters on. */
 @Serializable
-data class ModelDto(val id: String = "", val name: String = "", val provider: String? = null, val vendor: String? = null, val contextLength: Long = 0)
+data class ModelDto(
+    val id: String = "",
+    val name: String = "",
+    val provider: String? = null,
+    val vendor: String? = null,
+    val description: String = "",
+    val createdAt: Double = 0.0,
+    val contextLength: Long = 0,
+    /** US dollars per million tokens. */
+    val price: PriceDto = PriceDto(),
+    val vision: Boolean = false,
+    /** The levels it takes, such as off/low/medium/high; empty when it does not reason. */
+    val reasoning: List<String> = emptyList(),
+    val defaultReasoning: String = "off",
+    /** The plan its calls bill, such as "ChatGPT", when it runs on a subscription. */
+    val subscription: String? = null,
+    /** A plan model's larger context or fast mode: the model it is a variant of. */
+    val variant: ModelVariantDto? = null,
+)
+
+@Serializable
+data class PriceDto(val input: Double = 0.0, val output: Double = 0.0)
+
+@Serializable
+data class ModelVariantDto(val of: String = "", val context: String? = null, val fast: Boolean = false)
 
 @Serializable
 data class ModelsResponse(
@@ -153,6 +209,7 @@ data class CreateSessionRequest(
     val branch: String? = null,
     val planMode: Boolean = true,
     val spaceId: String? = null,
+    val reasoning: String? = null,
 )
 
 @Serializable
