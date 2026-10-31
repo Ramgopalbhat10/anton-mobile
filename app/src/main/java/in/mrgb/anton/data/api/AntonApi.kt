@@ -124,8 +124,6 @@ class AntonApi(private val config: () -> ServerConfig) {
                 // Coordinator text embeds <thread-reports>/<attachment>-style markup the web hides.
                 val text = p["text"]?.toString()?.let { if (it == "null") null else it.trim('"').replace("\\n", "\n") }
                     ?.replace(Regex("<attachment[^>]*/?>|<attachment[^>]*>.*?</attachment>", RegexOption.DOT_MATCHES_ALL), "")
-                    ?.replace(Regex("<thread-[a-z-]+[^>]*>.*?</thread-[a-z-]+>|<thread-[a-z-]+[^>]*/?>", RegexOption.DOT_MATCHES_ALL), "")
-                    ?.replace(Regex("</?attachment[^>]*>|</?thread-[a-z-]+[^>]*>", RegexOption.DOT_MATCHES_ALL), "")
                     ?.replace(Regex("An image: given with this message.*?cannot see\\.?", RegexOption.DOT_MATCHES_ALL), "")
                     ?.trim()?.ifBlank { null }
                 val data = (p["input"] ?: p["data"] ?: p) as? JsonObject
@@ -149,9 +147,38 @@ class AntonApi(private val config: () -> ServerConfig) {
                     else -> PartDto(type = "raw", text = text)
                 }
             }
-            MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = parts)
+            // <thread-reports> bodies carry <thread ...>...</thread> elements the
+            // web renders as thread cards — expand them into real parts here.
+            val expanded = parts.flatMap { part ->
+                if (part.type == "text" && part.text.orEmpty().contains("<thread")) threadParts(part.text!!)
+                else listOf(part)
+            }
+            MessageDto(id = m["id"]?.toString()?.trim('"') ?: "", role = role, parts = expanded)
                 .takeIf { it.parts.isNotEmpty() }
         }
+    }
+
+    /** <thread id="…" title="…" state="…" asks="…">inner</thread> → a thread card part + any residual text. */
+    private fun threadParts(raw: String): List<PartDto> {
+        val out = mutableListOf<PartDto>()
+        val block = Regex("<thread\\s+([^>]*)>(.*?)</thread>|<thread\\s+([^>]*)/>", RegexOption.DOT_MATCHES_ALL)
+        val attr = Regex("(\\w+)=\"([^\"]*)\"")
+        var rest = raw
+        block.findAll(raw).forEach { m ->
+            val attrs = attr.findAll(m.groupValues[1].ifBlank { m.groupValues[3] }).associate { it.groupValues[1] to it.groupValues[2] }
+            out += PartDto(
+                type = "thread",
+                name = attrs["id"],
+                title = attrs["title"],
+                state = attrs["state"],
+                question = attrs["asks"],
+                text = m.groupValues[2].trim().ifBlank { null },
+            )
+            rest = rest.replace(m.value, "")
+        }
+        rest.replace(Regex("</?thread[a-z-]*[^>]*>"), "").trim().takeIf { it.isNotBlank() }
+            ?.let { out += PartDto(type = "text", text = it) }
+        return out
     }
 
     /** The web's space PATCH — here it only ever sets the coordinator's model. */

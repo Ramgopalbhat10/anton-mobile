@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -208,7 +209,30 @@ private fun PartView(p: PartDto) {
     when (p.type) {
         "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
         "ask" -> AskCard(p)
+        "thread" -> ThreadCard(p)
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
+    }
+}
+
+/** A coordinator thread card — title + state on the header row, report text below. */
+@Composable
+fun ThreadCard(p: PartDto) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .border(1.dp, Anton.CardBorder, RoundedCornerShape(10.dp))
+            .background(Anton.WellBg).padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (p.state == "working") Anton.Accent else Anton.Success))
+            Text(p.title ?: "Thread", style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            p.state?.let { Text(it, style = Type.MonoLabel.copy(fontSize = 9.5.sp), color = Anton.TextDisabled, maxLines = 1) }
+        }
+        p.text?.let {
+            Markdown(it, colors = mdColors(), typography = mdType(), modifier = Modifier.padding(top = 5.dp))
+        }
+        p.question?.let {
+            Text(it, style = Type.Small, color = Anton.Accent, modifier = Modifier.padding(top = 5.dp))
+        }
     }
 }
 

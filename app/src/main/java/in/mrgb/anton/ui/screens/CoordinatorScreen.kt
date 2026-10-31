@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import `in`.mrgb.anton.ui.components.SheetChip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
@@ -69,7 +70,17 @@ fun CoordinatorScreen(
                     }
                 }
                 items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") UserMessage(m) else AgentMessage(m)
+                    if (m.role == "user") {
+                        m.parts.forEach { p ->
+                            when (p.type) {
+                                "thread" -> ThreadCard(p)
+                                "file" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                    SheetChip(null, p.title ?: p.path ?: "attachment", false) {}
+                                }
+                                else -> UserMessage(m.copy(parts = listOf(p)))
+                            }
+                        }
+                    } else AgentMessage(m)
                 }
             }
         }
