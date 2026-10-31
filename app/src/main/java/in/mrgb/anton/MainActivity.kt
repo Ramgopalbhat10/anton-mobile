@@ -51,7 +51,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AntonTheme { Surface(Modifier.fillMaxSize(), color = Anton.Canvas) { App() } } }
+        val images = (application as AntonApp).images
+        setContent {
+            AntonTheme {
+                Surface(Modifier.fillMaxSize(), color = Anton.Canvas) {
+                    `in`.mrgb.anton.ui.components.MediaHost(images) { App() }
+                }
+            }
+        }
     }
 }
 
@@ -127,12 +134,14 @@ private fun App() {
         is Screen.Coordinator -> {
             val vm = projectsVm(app)
             CoordinatorScreen(
+                spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 model = vm.coordinatorModel.collectAsState().value ?: "",
+                reasoning = vm.coordinatorReasoning.collectAsState().value,
                 models = vm.models.collectAsState().value,
-                onModel = { vm.setCoordinatorModel(s.id, it) },
+                onModel = { model, level -> vm.setCoordinatorModel(s.id, model, level) },
                 onLoadModels = vm::loadModels,
                 onSend = { vm.sendCoordinator(s.id, it) },
                 onBack = { back.removeLast() },
@@ -145,6 +154,7 @@ private fun App() {
                 bundle = vm.bundle.collectAsState().value,
                 messages = vm.messages.collectAsState().value,
                 models = vm.models.collectAsState().value,
+                reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 onBack = { back.removeLast() },
@@ -195,8 +205,8 @@ private fun App() {
                 creating = vm.creating.collectAsState().value,
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
-                onStart = { pid, branch, prompt, model ->
-                    vm.start(pid, branch, prompt, model) { id ->
+                onStart = { pid, branch, prompt, model, reasoning ->
+                    vm.start(pid, branch, prompt, model, reasoning) { id ->
                         newTask = false
                         if (id != null) push(Screen.Thread(id))
                     }

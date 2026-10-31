@@ -28,7 +28,7 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun session(id: String): SessionBundleDto = api.sessionBundle(id)
 
-    suspend fun messages(id: String): List<MessageDto> = api.messages(id)
+    suspend fun messages(id: String): List<MessageDto> = api.threadMessages(id)
 
     suspend fun spaces(): List<SpaceDto> = api.spaces()
 
@@ -42,7 +42,8 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun resume(id: String) = api.resumeSession(id)
 
-    suspend fun setModel(id: String, model: String) = api.updateSession(id, model = model)
+    suspend fun setModel(id: String, model: String, reasoning: String?) =
+        api.updateSession(id, model = model, reasoning = reasoning, setReasoning = true)
 
     suspend fun models() = api.models()
 }

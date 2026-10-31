@@ -46,13 +46,14 @@ fun NewTaskSheet(
     creating: Boolean,
     onRepo: (String?) -> Unit,
     onPlanFirst: (Boolean) -> Unit,
-    onStart: (projectId: String?, branch: String?, prompt: String, model: String?) -> Unit,
+    onStart: (projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var repo by remember { mutableStateOf(repos.firstOrNull()?.first) }
     var branch by remember { mutableStateOf(branches.firstOrNull()) }
     var prompt by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf(models.firstOrNull()?.id) }
+    var model by remember { mutableStateOf(models.firstOrNull { it.variant == null }?.id) }
+    var reasoning by remember { mutableStateOf<String?>(null) }
     var modelMenu by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -112,14 +113,15 @@ fun NewTaskSheet(
                     }
                     Box(Modifier.widthIn(max = 180.dp)) {
                         SelectChip(
-                            models.firstOrNull { it.id == model }?.name ?: model?.substringAfterLast('/') ?: "Model",
+                            model?.let { Catalog.chipLabel(models, it, reasoning) } ?: "Model",
                             onClick = { modelMenu = true }, dot = Anton.Accent, open = modelMenu,
                         )
                         if (modelMenu) {
                             ModelPickerSheet(
                                 models = models,
                                 selected = model ?: "",
-                                onPick = { model = it; modelMenu = false },
+                                reasoning = reasoning,
+                                onPick = { id, level -> model = id; reasoning = level; modelMenu = false },
                                 onDismiss = { modelMenu = false },
                             )
                         }
@@ -129,7 +131,7 @@ fun NewTaskSheet(
                 Box(
                     Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
                         .background(if (canStart) Anton.Accent else Anton.N750)
-                        .clickable(enabled = canStart, role = Role.Button) { onStart(repo, branch, prompt, model) },
+                        .clickable(enabled = canStart, role = Role.Button) { onStart(repo, branch, prompt, model, reasoning) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

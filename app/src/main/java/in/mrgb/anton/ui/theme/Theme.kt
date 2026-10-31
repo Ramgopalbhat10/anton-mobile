@@ -105,6 +105,13 @@ object Anton {
     val DangerBg = Color(0x1AE5544F)
     val DangerBorder = Color(0x4DE5544F)
 
+    /* Data tones (instrument.css --data-1…5): commands, edits, browser, PRs, subagents. */
+    val Data1 = Color(0xFF3FB6D8)
+    val Data2 = Color(0xFFA78BFA)
+    val Data3 = Color(0xFFE3A63F)
+    val Data4 = Color(0xFF35C88A)
+    val Data5 = Color(0xFFF472B6)
+
     /** in-card's vertical gradient. */
     val CardGradient = Brush.verticalGradient(listOf(CardBgTop, CardBg))
 }

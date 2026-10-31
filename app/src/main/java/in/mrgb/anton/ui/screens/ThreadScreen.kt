@@ -23,7 +23,9 @@ import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.MessageDto
+import `in`.mrgb.anton.data.api.Outputs
 import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
@@ -42,13 +44,14 @@ fun ThreadScreen(
     bundle: SessionBundleDto?,
     messages: List<MessageDto>,
     models: List<ModelDto>,
+    reasoning: String?,
     sending: Boolean,
     webUrl: String,
     onBack: () -> Unit,
     onSend: (String) -> Unit,
     onAbort: () -> Unit,
     onStop: () -> Unit,
-    onModel: (String) -> Unit,
+    onModel: (model: String, reasoning: String?) -> Unit,
     onLoadModels: () -> Unit,
 ) {
     val s = bundle?.session
@@ -93,16 +96,21 @@ fun ThreadScreen(
         val tailSize = messages.size + messages.lastOrNull().let { m -> m?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalAnswer provides onSend) {
+            CompositionLocalProvider(
+                LocalAnswer provides onSend,
+                LocalRuns provides bundle?.runs.orEmpty(),
+                LocalFilePlace provides FilePlace(sessionId = s?.id, spaceId = s?.spaceId),
+            ) {
             LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                val lastAgent = messages.lastOrNull()?.takeIf { it.role != "user" }
                 items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") UserMessage(m) else AgentMessage(m)
+                    if (m.role == "user") UserMessage(m) else AgentMessage(m, live = s?.working == true && m === lastAgent)
                 }
                 bundle?.pullRequest?.let { pr -> item { PrCard(pr, s) } }
                 bundle?.waiting?.lastOrNull()?.let { w ->
                     item { QueuedNote(w.text) }
                 }
-                if (s?.working == true) {
+                if (s?.working == true && lastAgent == null) {
                     item { TraceRow("Working on your reply…", live = true) }
                 }
             }
@@ -115,7 +123,8 @@ fun ThreadScreen(
                     sending = sending,
                     onSend = onSend,
                     onStop = onAbort,
-                    model = s?.model?.substringAfterLast('/') ?: "",
+                    model = s?.model ?: "",
+                    reasoning = reasoning,
                     models = models,
                     onModel = onModel,
                     onLoadModels = onLoadModels,
@@ -126,8 +135,8 @@ fun ThreadScreen(
 }
 
 @Composable
-private fun mdColors() = markdownColor(
-    text = Anton.TextPrimary,
+internal fun mdColors(text: androidx.compose.ui.graphics.Color = Anton.TextPrimary) = markdownColor(
+    text = text,
     codeText = Anton.TextSecondary,
     inlineCodeText = Anton.AccentHover,
     codeBackground = Anton.Inset,
@@ -136,57 +145,72 @@ private fun mdColors() = markdownColor(
     linkText = Anton.Accent,
 )
 
+/** The transcript's Markdown type; `small` for the words between steps in a work card. */
 @Composable
-private fun mdType() = markdownTypography(
-    text = Type.Body.copy(lineHeight = 19.sp),
-    h1 = Type.Heading,
-    h2 = Type.BodyMedium.copy(fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-    h3 = Type.BodyMedium,
-    h4 = Type.BodyMedium,
-    h5 = Type.BodyMedium,
-    h6 = Type.BodyMedium,
-    code = Type.Code,
-    inlineCode = Type.Code.copy(fontSize = 12.sp),
-    list = Type.Body.copy(lineHeight = 19.sp),
-    bullet = Type.Body,
-    quote = Type.Body.copy(lineHeight = 19.sp, color = Anton.TextSecondary),
-    paragraph = Type.Body.copy(lineHeight = 19.sp),
-    link = Type.Body.copy(lineHeight = 19.sp, color = Anton.Accent),
-    ordered = Type.Body.copy(lineHeight = 19.sp),
-)
+internal fun mdType(small: Boolean = false): com.mikepenz.markdown.model.MarkdownTypography {
+    val body = if (small) Type.Small.copy(fontSize = 12.5.sp, lineHeight = 18.sp) else Type.Body.copy(lineHeight = 19.sp)
+    return markdownTypography(
+        text = body,
+        h1 = Type.Heading,
+        h2 = Type.BodyMedium.copy(fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+        h3 = Type.BodyMedium,
+        h4 = Type.BodyMedium,
+        h5 = Type.BodyMedium,
+        h6 = Type.BodyMedium,
+        code = Type.Code,
+        inlineCode = Type.Code.copy(fontSize = 12.sp),
+        list = body,
+        bullet = body,
+        quote = body.copy(color = Anton.TextSecondary),
+        paragraph = body,
+        link = body.copy(color = Anton.Accent),
+        ordered = body,
+    )
+}
 
 @Composable
 fun UserMessage(m: MessageDto) {
     val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
-    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End) {
-        Box(
-            Modifier
-                .clip(shape)
-                .background(Anton.Overlay)
-                .border(1.dp, Anton.CardBorder, shape)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-        ) {
-            Text(m.parts.firstOrNull { it.type == "text" }?.text.orEmpty(), style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
+    // Attached files show as chips; the text they carry is the agent's to read.
+    val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
+    val images = m.parts.filter { it.type == "file" && it.mediaType?.startsWith("image/") == true && !it.url.isNullOrBlank() }
+    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (images.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                images.forEach { img -> ImageCard(img.url!!, img.title ?: img.path ?: "Attached image", height = 120.dp, caption = false) }
+            }
+        }
+        SentAttachments(split.files)
+        if (split.text.isNotBlank()) {
+            Box(
+                Modifier
+                    .clip(shape)
+                    .background(Anton.Overlay)
+                    .border(1.dp, Anton.CardBorder, shape)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            ) {
+                Text(split.text, style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
+            }
         }
     }
 }
 
+/**
+ * A reply: one work card for everything it did (thoughts, tools, subagents
+ * and the words between them), then its answer, then what it made for you.
+ */
 @Composable
-fun AgentMessage(m: MessageDto) {
-    // The web collapses the work strip (reasoning + tools + files) into one
-    // "N STEPS" card between text replies; mirror that grouping here.
-    val chunks = mutableListOf<List<PartDto>>()
-    for (p in m.parts) {
-        val step = p.type in setOf("reasoning", "tool", "file")
-        if (step && chunks.lastOrNull()?.firstOrNull()?.type in setOf("reasoning", "tool", "file")) {
-            chunks[chunks.lastIndex] = chunks.last() + p
-        } else chunks.add(listOf(p))
-    }
+fun AgentMessage(m: MessageDto, live: Boolean = false) {
+    val (work, rest) = remember(m.parts) { splitWork(m.parts) }
+    val outputs = remember(m.parts) { Outputs.ofReply(m.parts) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        chunks.forEach { chunk ->
-            if (chunk.first().type in setOf("reasoning", "tool", "file")) StepsCard(chunk)
-            else PartView(chunk.first())
+        if (work.isNotEmpty()) {
+            WorkCard(work, live = live, durationMs = m.durationMs) { text ->
+                Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true))
+            }
         }
+        rest.forEach { PartView(it) }
+        if (outputs.isNotEmpty()) ReplyOutputs(outputs)
     }
 }
 
@@ -196,6 +220,8 @@ private fun PartView(p: PartDto) {
         "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
         "ask" -> AskCard(p)
         "thread" -> ThreadCard(p)
+        "file" -> if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, p.title ?: p.path ?: "Image")
+            else p.path?.let { FileChip(it.substringAfterLast('/'), p.mediaType) }
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
     }
 }
@@ -223,89 +249,6 @@ fun ThreadCard(p: PartDto) {
                     }
                 }
             }
-        }
-    }
-}
-
-/** The web's work strip: "Worked" + mini bars + "N STEPS"; expanding lists each step. */
-@Composable
-private fun StepsCard(parts: List<PartDto>) {
-    var open by remember { mutableStateOf(false) }
-    val chevron by androidx.compose.animation.core.animateFloatAsState(if (open) 0f else -90f, label = "chev")
-    val shape = RoundedCornerShape(10.dp)
-    Column(
-        Modifier.fillMaxWidth().clip(shape)
-            .background(Anton.WellBg)
-            .border(1.dp, Anton.WellBorder, shape)
-            .animateContentSize(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().clickable { open = !open }.height(36.dp).padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Lucide.ChevronDown, if (open) "Collapse" else "Expand", tint = Anton.IconTertiary, modifier = Modifier.size(14.dp).rotate(chevron))
-            Spacer(Modifier.width(8.dp))
-            Text("Worked", style = Type.Small, color = Anton.TextSecondary)
-            Spacer(Modifier.weight(1f))
-            // The web's mini bars mark next to the step count.
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                parts.take(10).forEach { p ->
-                    Box(
-                        Modifier.width(2.dp).height(10.dp).clip(RoundedCornerShape(1.dp)).background(
-                            if (p.state == null || p.state in setOf("done", "completed", "success", "output-available")) Anton.Success.copy(alpha = 0.8f) else Anton.Accent
-                        ),
-                    )
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("${parts.size} steps", style = Type.Num, color = Anton.TextTertiary)
-        }
-        if (open) {
-            Hairline(color = Anton.WellBorder)
-            Column(Modifier.padding(vertical = 6.dp)) {
-                parts.forEach { p ->
-                    when (p.type) {
-                        "reasoning" -> ThoughtRow(p.text.orEmpty())
-                        "tool" -> StepRow(p.title ?: p.name ?: "Tool", p.state)
-                        "file" -> p.path?.let { path -> StepRow(path, "file") }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** A single tool step: side bar + name + dimmed status, like the web's step rows. */
-@Composable
-private fun StepRow(title: String, state: String?) {
-    Row(
-        Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.width(3.dp).height(12.dp).clip(RoundedCornerShape(1.5.dp)).background(Anton.N600))
-        Text(title, style = Type.Num.copy(fontSize = 11.5.sp), color = Anton.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-        if (!state.isNullOrBlank()) Text(state.replace("output-available", "done"), style = Type.Num.copy(fontSize = 10.5.sp), color = Anton.TextDisabled, maxLines = 1)
-    }
-}
-
-/** Reasoning renders as "Thought · N words" that expands to the full thought. */
-@Composable
-private fun ThoughtRow(text: String) {
-    var expanded by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
-        Row(
-            Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(Modifier.width(3.dp).height(12.dp).clip(RoundedCornerShape(1.5.dp)).background(Anton.N600))
-            Text("Thought", style = Type.Small, color = Anton.TextTertiary)
-            Text("· ${text.split(Regex("\\s+")).count { it.isNotBlank() }} words", style = Type.Num, color = Anton.TextDisabled)
-        }
-        if (expanded) {
-            Text(
-                text, style = Type.Small.copy(lineHeight = 17.sp), color = Anton.TextSecondary,
-                modifier = Modifier.padding(start = 23.dp, end = 12.dp, top = 2.dp, bottom = 6.dp),
-            )
         }
     }
 }
@@ -384,7 +327,7 @@ private fun AskCard(p: PartDto) {
             Box(
                 Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Lucide.CircleHelp, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
+            ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
             Column(Modifier.weight(1f)) {
                 Text(p.question.orEmpty(), style = Type.BodyMedium.copy(lineHeight = 20.sp), color = Anton.TextPrimary)
                 Text(
@@ -452,70 +395,21 @@ private fun QueuedNote(text: String) {
 private fun Composer(
     working: Boolean, sending: Boolean,
     onSend: (String) -> Unit, onStop: () -> Unit,
-    model: String, models: List<ModelDto>, onModel: (String) -> Unit, onLoadModels: () -> Unit,
+    model: String, reasoning: String?, models: List<ModelDto>,
+    onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 12.dp).padding(top = 6.dp, bottom = 10.dp)) {
         AntonComposer(
             placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
-            working = working, sending = sending, model = model,
+            working = working, sending = sending,
+            model = if (model.isBlank()) "" else Catalog.chipLabel(models, model, reasoning),
             onSend = onSend, onStop = onStop,
             onOpenModel = onLoadModels,
             modelPicker = { dismiss ->
-                ModelPickerSheet(models = models, selected = model, onPick = { dismiss(); onModel(it) }, onDismiss = dismiss)
+                ModelPickerSheet(models = models, selected = model, reasoning = reasoning, onPick = { id, level -> dismiss(); onModel(id, level) }, onDismiss = dismiss)
             },
         )
     }
-    }
-}
-
-/** Full model picker — the web's model combobox as a sheet: search + models grouped by vendor. */
-@Composable
-fun ModelPickerSheet(
-    models: List<ModelDto>,
-    selected: String,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var q by remember { mutableStateOf("") }
-    AntonSheet(onDismiss = onDismiss, title = "Model", subtitle = if (models.isEmpty()) "Loading models…" else "${models.size} available") {
-        AntonInput(
-            q, { q = it },
-            placeholder = "Search models…",
-            leadingIcon = Lucide.Search,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 6.dp),
-            trailing = if (q.isNotEmpty()) ({
-                Icon(Lucide.X, "Clear", tint = Anton.IconTertiary, modifier = Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)).clickable { q = "" }.padding(4.dp))
-            }) else null,
-        )
-        val shown = models.filter {
-            q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) || it.vendor?.contains(q, true) == true
-        }
-        LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.72f), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 24.dp)) {
-            shown.groupBy { it.vendor ?: it.provider ?: "Other" }.forEach { (vendor, group) ->
-                item(key = "v-$vendor") { SectionLabel(vendor, group.size, Modifier.padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 4.dp)) }
-                items(group, key = { it.id }) { m ->
-                    val on = m.id == selected || m.id.substringAfterLast('/') == selected
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                            .background(if (on) Anton.AccentBg else Color.Transparent)
-                            .clickable { onPick(m.id) }
-                            .padding(horizontal = 10.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(m.name.ifBlank { m.id }, style = Type.BodyMedium, color = if (on) Anton.AccentHover else Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(m.id, style = Type.Num, color = Anton.TextDisabled, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        if (m.contextLength > 0) Text("${m.contextLength / 1000}k", style = Type.Num, color = Anton.TextTertiary)
-                        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                            if (on) Icon(Lucide.Check, "Current", tint = Anton.Accent, modifier = Modifier.size(15.dp))
-                        }
-                    }
-                }
-            }
-            if (shown.isEmpty() && models.isNotEmpty()) item { EmptyState(Lucide.Search, "No models match", "Try a vendor or a model id.") }
-        }
     }
 }
