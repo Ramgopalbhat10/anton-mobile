@@ -240,14 +240,17 @@ private fun PartDto.failed() = state == "output-error"
 /**
  * One parent card for the whole turn: everything up to and including the last
  * step part — thoughts, tools, task calls, and the words between them — sits
- * on its rail; only what the reply says after the last step is its real
- * response, rendered outside. Returns (work on the rail, parts shown after).
+ * on its rail (each mid-turn line as a "Rendered '…'" marker); the last of
+ * those lines and everything after the last step is the real response,
+ * rendered outside. Returns (work on the rail, parts shown after).
  */
 fun splitReply(parts: List<PartDto>): Pair<List<PartDto>, List<PartDto>> {
     val lastWork = parts.indexOfLast { it.type in STEP_TYPES }
     if (lastWork < 0) return emptyList<PartDto>() to parts
+    val lastText = parts.take(lastWork + 1).indexOfLast { it.type == "text" }
     val work = parts.take(lastWork + 1).filter { it.type in STEP_TYPES || it.type == "text" }
-    val outside = parts.filterIndexed { i, p -> i > lastWork || (p.type !in STEP_TYPES && p.type != "text") }
+    // only the last mid-turn line joins the real response; earlier words stay rail markers
+    val outside = parts.filterIndexed { i, p -> p.type !in STEP_TYPES && (i >= lastText || p.type != "text") }
     return work to outside
 }
 
@@ -261,7 +264,6 @@ fun WorkCard(
     parts: List<PartDto>,
     live: Boolean,
     durationMs: Long?,
-    narration: @Composable (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(live) }
     LaunchedEffect(live) { open = live }
@@ -310,7 +312,13 @@ fun WorkCard(
                         p.type == "reasoning" -> ThoughtStep(p)
                         p.type == "tool" && p.name == "task" -> AgentStep(p)
                         p.type == "tool" -> ToolStep(p)
-                        p.type == "text" -> NarrationStep { narration(p.text.orEmpty().trim()) }
+                        p.type == "text" -> NarrationStep {
+                            Text(
+                                "Rendered \u2018${plainLine(p.text)}\u2019",
+                                style = Type.Small.copy(lineHeight = 20.sp), color = Anton.TextTertiary,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }

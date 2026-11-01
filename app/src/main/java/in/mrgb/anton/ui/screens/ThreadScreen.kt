@@ -211,9 +211,7 @@ fun AgentMessage(m: MessageDto, live: Boolean = false) {
     val outputs = remember(m.parts) { Outputs.ofReply(m.parts) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (work.isNotEmpty()) {
-            WorkCard(work, live = live && rest.isEmpty(), durationMs = m.durationMs) { text ->
-                Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
-            }
+            WorkCard(work, live = live && m.parts.lastOrNull()?.type in setOf("reasoning", "tool"), durationMs = m.durationMs)
         }
         rest.forEach { PartView(it) }
         if (outputs.isNotEmpty()) ReplyOutputs(outputs)
