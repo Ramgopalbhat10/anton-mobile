@@ -5,10 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
-import android.content.ContentValues
 import android.util.Base64
 import android.util.LruCache
 import android.webkit.WebView
@@ -59,9 +55,7 @@ import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
 import com.mikepenz.markdown.m3.Markdown
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URLEncoder
 
 /**
@@ -101,6 +95,9 @@ class ImageStore(private val api: AntonApi) {
 
 val LocalImages = staticCompositionLocalOf<ImageStore?> { null }
 
+/** The host owns the system document picker; standalone snapshot panels need no registry. */
+private val LocalDownload = staticCompositionLocalOf<(Artifact) -> Unit> { {} }
+
 /**
  * Where a transcript's files are served: a task's Library (outputs and the
  * files you attached under uploads/) or its project's Library.
@@ -138,7 +135,12 @@ val LocalViewer = staticCompositionLocalOf<((items: List<Artifact>, index: Int) 
 @Composable
 fun MediaHost(images: ImageStore?, content: @Composable () -> Unit) {
     var viewing by remember { mutableStateOf<Pair<List<Artifact>, Int>?>(null) }
-    CompositionLocalProvider(LocalImages provides images, LocalViewer provides { items, index -> viewing = items to index }) {
+    val download = rememberArtifactDownload(images)
+    CompositionLocalProvider(
+        LocalImages provides images,
+        LocalDownload provides download,
+        LocalViewer provides { items, index -> viewing = items to index },
+    ) {
         content()
         viewing?.let { (items, index) -> ArtifactViewer(items, index) { viewing = null } }
     }
@@ -186,9 +188,6 @@ fun ArtifactViewer(items: List<Artifact>, start: Int, onDismiss: () -> Unit) {
 }
 
 /** The slider's panel — apart from the dialog so snapshots can render it. */
-// Same keyed-produceState lint false positive as RemoteImage; value is assigned below.
-// Remove after a toolchain upgrade: https://issuetracker.google.com/issues/368420773
-@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     var index by remember { mutableIntStateOf(start.coerceIn(0, items.lastIndex)) }
@@ -196,10 +195,8 @@ fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modi
     val store = LocalImages.current
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val scope = rememberCoroutineScope()
-    val body by produceState<Any?>(null, a.url, store) {
-        if (value == null) value = store?.fetch(a.url) ?: false
-    }
+    val download = LocalDownload.current
+    val body by rememberArtifactBody(a.url, store) { store?.fetch(it) }
     Column(modifier.background(Anton.Canvas)) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 8.dp),
@@ -215,7 +212,7 @@ fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modi
             }
             when (a.kind) {
                 Artifact.Kind.Image, Artifact.Kind.Other ->
-                    GhostIconButton(Lucide.Download, "Download", tint = Anton.IconSecondary, iconSize = 18.dp) { download(context, scope, store, a) }
+                    GhostIconButton(Lucide.Download, "Download", tint = Anton.IconSecondary, iconSize = 18.dp) { download(a) }
                 else ->
                     GhostIconButton(Lucide.Copy, "Copy", tint = Anton.IconSecondary, iconSize = 18.dp) {
                         (body as? ByteArray)?.let { clipboard.setText(AnnotatedString(String(it))) ; toast(context, "Copied") }
@@ -224,19 +221,22 @@ fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modi
             GhostIconButton(Lucide.X, "Close", tint = Anton.IconSecondary, iconSize = 20.dp, onClick = onDismiss)
         }
         Box(Modifier.weight(1f).fillMaxWidth().hairlineTop(Anton.BorderSubtle)) {
-            when {
-                body == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner(20.dp) }
-                body == false -> ArtifactFallback(store, a, context, scope, error = true)
-                else -> when (a.kind) {
-                    Artifact.Kind.Image -> ZoomedImage(a.url, a.name)
-                    Artifact.Kind.Html -> HtmlView(String(body as ByteArray))
-                    Artifact.Kind.Markdown -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
-                        Markdown(String(body as ByteArray), colors = mdColors(), typography = mdType(), padding = mdPadding())
+            // New URL = new preview subtree, including WebView, image zoom and scroll state.
+            key(a.url) {
+                when {
+                    body == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner(20.dp) }
+                    body == false -> ArtifactFallback(store, a, context, error = true, onDownload = { download(a) })
+                    else -> when (a.kind) {
+                        Artifact.Kind.Image -> ZoomedImage(a.url, a.name)
+                        Artifact.Kind.Html -> HtmlView(String(body as ByteArray))
+                        Artifact.Kind.Markdown -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
+                            Markdown(String(body as ByteArray), colors = mdColors(), typography = mdType(), padding = mdPadding())
+                        }
+                        Artifact.Kind.Text -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
+                            Text(String(body as ByteArray), style = Type.Code.copy(fontSize = 12.5.sp, lineHeight = 19.sp), color = Anton.TextSecondary, softWrap = false)
+                        }
+                        Artifact.Kind.Other -> ArtifactFallback(store, a, context, error = false, onDownload = { download(a) })
                     }
-                    Artifact.Kind.Text -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
-                        Text(String(body as ByteArray), style = Type.Code.copy(fontSize = 12.5.sp, lineHeight = 19.sp), color = Anton.TextSecondary, softWrap = false)
-                    }
-                    Artifact.Kind.Other -> ArtifactFallback(store, a, context, scope, error = false)
                 }
             }
         }
@@ -291,7 +291,7 @@ private fun HtmlView(html: String) {
 
 /** The file the slider can't preview: an offer to open it on the web or save it. */
 @Composable
-private fun ArtifactFallback(store: ImageStore?, a: Artifact, context: Context, scope: kotlinx.coroutines.CoroutineScope, error: Boolean) {
+private fun ArtifactFallback(store: ImageStore?, a: Artifact, context: Context, error: Boolean, onDownload: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Icon(Lucide.File, null, tint = Anton.IconDisabled, modifier = Modifier.size(34.dp))
         Spacer(Modifier.height(12.dp))
@@ -308,34 +308,12 @@ private fun ArtifactFallback(store: ImageStore?, a: Artifact, context: Context, 
                     onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(s.absolute(a.url)))) })
             }
             AntonButton("Download", variant = ButtonVariant.Outline, size = ButtonSize.Sm, icon = Lucide.Download,
-                onClick = { download(context, scope, store, a) })
+                onClick = onDownload)
         }
     }
 }
 
 private fun toast(context: Context, text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-
-private fun download(context: Context, scope: kotlinx.coroutines.CoroutineScope, store: ImageStore?, a: Artifact) {
-    scope.launch {
-        val data = store?.fetch(a.url)
-        if (data == null) { toast(context, "Couldn't download the file"); return@launch }
-        val name = a.name.substringAfterLast('/')
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, name)
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                }
-                context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?.also { uri -> context.contentResolver.openOutputStream(uri)?.use { it.write(data) } }
-                    ?: error("no uri")
-            } else {
-                File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name).writeBytes(data)
-            }
-        }.onSuccess { toast(context, "Saved to Downloads") }
-            .onFailure { toast(context, "Couldn't save the file") }
-    }
-}
 
 /**
  * The web's FileChip: a small raised tile with the file's mark (a thumbnail

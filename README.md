@@ -37,7 +37,7 @@ Sending stays on `POST /api/agents/coder/:id` (budget checks + priming run there
 
 ## Auth
 
-The server sits behind Cloudflare Access. The app sends a **Service Token** on every request — including the SSE stream and uploads:
+The server sits behind Cloudflare Access. The app sends a **Service Token** only to the configured server's exact origin (scheme, host, and port), including the SSE stream and uploads. External artifact URLs are fetched without these credentials; redirects are checked on every network hop:
 
 ```
 CF-Access-Client-Id: …
@@ -45,6 +45,10 @@ CF-Access-Client-Secret: …
 ```
 
 Create the token in Zero Trust → Access → Service Auth → Service Tokens, and add a Service Auth policy allowing it on the application's Access app. Enter the pair once in the app's Settings (stored in DataStore; rotate from the dashboard if the phone is lost). Browsers keep their email+OTP flow untouched.
+
+## Artifact downloads
+
+Artifact downloads use Android's system **Save as** document picker on every supported version, including Android 8 and 9. Choose the destination (for example Downloads); no broad storage permission is needed. Cancelling the picker does not download a file, and a save is reported only after the destination stream closes successfully.
 
 ## Build
 
