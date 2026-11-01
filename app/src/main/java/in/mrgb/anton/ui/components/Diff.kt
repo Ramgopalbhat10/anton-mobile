@@ -190,32 +190,104 @@ private fun DiffLines(file: FileDiff) {
     }
 }
 
-/* ── Tiny syntax highlighter — Kotlin/Java only, plain text elsewhere. ── */
+/* ── Tiny syntax highlighter — comment/string/keyword/number tokens per language family. ── */
 
-private val KW = Regex("\\b(package|import|fun|val|var|class|interface|object|return|if|else|when|for|while|do|try|catch|finally|throw|is|in|as|by|constructor|init|this|super|null|true|false|data|sealed|enum|companion|private|public|internal|protected|override|abstract|open|suspend|inline|typealias|new|final|static|extends|implements|void|int|long|boolean|double|float|char|byte|short)\\b")
-private val TOKEN = Regex("(//.*$)|(/\\*.*?\\*/)|(\"(?:\\\\.|[^\"\\\\])*\")|('(?:\\\\.|[^'\\\\])')|(@\\w+)|\\b(0x[0-9a-fA-F]+|\\d+(?:\\.\\d+)?[fLl]?)\\b")
+private val C_LIKE = "abstract|as|async|await|boolean|break|byte|case|catch|char|class|companion|const|constructor|continue|data|defer|do|double|else|enum|extends|extern|final|finally|float|fn|for|func|fun|go|goto|if|impl|implements|import|in|init|inline|int|interface|internal|is|let|long|match|mod|mut|new|null|object|open|override|package|private|protected|pub|public|return|sealed|short|sizeof|static|struct|super|suspend|switch|this|throw|trait|true|try|type|typealias|typedef|union|unsafe|use|val|var|void|volatile|when|where|while"
+private val JS_LIKE = "async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|static|super|switch|this|throw|true|try|type|typeof|undefined|var|void|while|with|yield|enum|implements|private|protected|public|readonly|namespace|declare|abstract|keyof|infer|never|unknown|any|number|string|boolean|symbol"
+private val PY_LIKE = "and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield|match|case|self|cls"
+private val SH_LIKE = "case|do|done|elif|else|esac|export|fi|for|function|if|in|local|return|then|until|while|echo|cd|set|source|alias|readonly|shift|trap|exit|eval|exec"
+private val SQL_LIKE = "add|all|alter|and|as|asc|between|by|case|check|column|create|delete|desc|distinct|drop|else|exists|from|group|having|in|index|inner|insert|into|is|join|key|left|like|limit|not|null|on|or|order|outer|primary|references|right|select|set|table|then|union|unique|update|values|view|when|where"
+private val RB_LIKE = "alias|and|begin|break|case|class|def|defined|do|else|elsif|end|ensure|false|for|if|in|module|next|nil|not|or|redo|rescue|retry|return|self|super|then|true|undef|unless|until|when|while|yield|attr_accessor|attr_reader|attr_writer|require|include|extend|private|protected|public|lambda|proc|raise"
+private val CSS_LIKE = "important|inherit|initial|none|auto|block|flex|grid|inline|absolute|relative|fixed|solid|hidden|display|color|background|border|margin|padding|font|width|height|top|left|right|bottom|position|content|media|keyframes|import"
+private val GENERIC = "class|def|else|for|function|if|import|in|new|null|return|this|true|false|try|while|public|private|static|void|var|let|const"
 
-private fun isCode(path: String) = path.substringAfterLast('.', "").lowercase() in setOf("kt", "kts", "java")
+private data class Lang(
+    /** Keyword alternatives (bare, wrapped in word boundaries when used), or null to skip keyword coloring. */
+    val kw: String?,
+    /** Regex alternation for comment spans (line and block forms), or null. */
+    val comments: String?,
+    /** Whether `…` is a string delimiter too (js/go templates). */
+    val backtick: Boolean = false,
+    /** '@' decorations (java/kt/py/js decorators). */
+    val at: Boolean = true,
+)
+
+private val LANGS = mapOf(
+    "kt" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"), "kts" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "java" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"), "scala" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "go" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/", backtick = true),
+    "rs" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "c" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"), "h" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "cpp" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"), "cc" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "hpp" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"), "cs" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "swift" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "js" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/", backtick = true), "mjs" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/", backtick = true),
+    "jsx" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/", backtick = true),
+    "ts" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/", backtick = true), "tsx" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/", backtick = true),
+    "vue" to Lang(JS_LIKE, "//.*$|/\\*.*?\\*/|<!--.*?-->", backtick = true),
+    "py" to Lang(PY_LIKE, "#.*$"), "pyw" to Lang(PY_LIKE, "#.*$"), "ipynb" to Lang(PY_LIKE, "#.*$"),
+    "rb" to Lang(RB_LIKE, "#.*$"), "rake" to Lang(RB_LIKE, "#.*$"),
+    "sh" to Lang(SH_LIKE, "#.*$", at = false), "bash" to Lang(SH_LIKE, "#.*$", at = false),
+    "zsh" to Lang(SH_LIKE, "#.*$", at = false), "fish" to Lang(SH_LIKE, "#.*$", at = false),
+    "ps1" to Lang(SH_LIKE, "#.*$", at = false), "bat" to Lang(null, "(?i)rem\\s.*$", at = false),
+    "yaml" to Lang("true|false|null|yes|no|on|off", "#.*$", at = false), "yml" to Lang("true|false|null|yes|no|on|off", "#.*$", at = false),
+    "toml" to Lang("true|false", "#.*$", at = false), "ini" to Lang("true|false|null", ";.*$|#.*$", at = false),
+    "cfg" to Lang("true|false|null", ";.*$|#.*$", at = false), "env" to Lang(null, "#.*$", at = false),
+    "sql" to Lang(SQL_LIKE, "--.*$|/\\*.*?\\*/"),
+    "json" to Lang("true|false|null", null), "jsonl" to Lang("true|false|null", null),
+    "xml" to Lang(null, "<!--.*?-->"), "html" to Lang(null, "<!--.*?-->"), "htm" to Lang(null, "<!--.*?-->"),
+    "svg" to Lang(null, "<!--.*?-->"), "xhtml" to Lang(null, "<!--.*?-->"),
+    "css" to Lang(CSS_LIKE, "/\\*.*?\\*/"), "scss" to Lang(CSS_LIKE, "//.*$|/\\*.*?\\*/"),
+    "less" to Lang(CSS_LIKE, "//.*$|/\\*.*?\\*/"),
+    "lua" to Lang("and|break|do|else|elseif|end|false|for|function|goto|if|in|local|nil|not|or|repeat|return|then|true|until|while", "--.*$|--\\[\\[.*?\\]\\]"),
+    "pl" to Lang(GENERIC + "|my|sub|use|package|elsif|unless|until|foreach|eq|ne|gt|lt|ge|le|and|or|not", "#.*$"),
+    "php" to Lang(GENERIC + "|echo|fn|foreach|implements|include|instanceof|interface|match|namespace|print|require|use|yield", "//.*$|#.*$|/\\*.*?\\*/"),
+    "r" to Lang(GENERIC + "|else|function|in|next|repeat|if|for|while|TRUE|FALSE|NULL|NA|Inf|library|require", "#.*$"),
+    "ex" to Lang(GENERIC + "|alias|and|do|def|defmodule|defp|end|fn|import|not|or|require|use|when|with", "#.*$"),
+    "erl" to Lang(GENERIC + "|and|begin|case|do|end|fun|if|of|receive|when|not|or", "%.*$"),
+    "hs" to Lang(GENERIC + "|case|class|data|deriving|do|else|if|import|in|infix|infixl|infixr|instance|let|module|newtype|of|then|type|where", "--.*$|\\{-.*?-\\}"),
+    "ml" to Lang(GENERIC + "|and|begin|else|end|exception|fun|function|functor|if|in|include|let|match|module|mutable|of|open|or|rec|sig|struct|then|type|val|when|while|with", "\\(\\*.*?\\*\\)"),
+    "dockerfile" to Lang("add|arg|cmd|copy|entrypoint|env|expose|from|healthcheck|label|maintainer|onbuild|run|shell|stopsignal|user|volume|workdir", "#.*$", at = false),
+    "gradle" to Lang(C_LIKE, "//.*$|/\\*.*?\\*/"),
+    "diff" to Lang(null, null), "patch" to Lang(null, null),
+)
+
+/** Per-language token regex, built once. Groups: 1 comment, 2 string, 3 decorator, 4 number. */
+private val TOKEN_CACHE = mutableMapOf<Lang, Regex>()
+
+private fun tokenRe(lang: Lang): Regex = TOKEN_CACHE.getOrPut(lang) {
+    val comment = lang.comments ?: ""
+    val str = "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])'" + if (lang.backtick) "|`(?:\\\\.|[^`\\\\])*`" else ""
+    val pat = if (comment.isNotEmpty()) "($comment)" else "(?!)"
+    val dec = if (lang.at) "@\\w+" else "(?!)"
+    Regex("$pat|($str)|($dec)|\\b(0x[0-9a-fA-F]+|0b[01]+|\\d[\\d_]*(?:\\.\\d+)?[fLlUu]?)\\b")
+}
+
+private fun kwRe(lang: Lang): Regex? = lang.kw?.let { Regex("\\b($it)\\b", RegexOption.IGNORE_CASE) }
+
+private fun langOf(path: String): Lang? = LANGS[path.substringAfterLast('.', "").lowercase()]
 
 private fun highlight(text: String, path: String, add: Boolean, del: Boolean): AnnotatedString {
     val base = if (add) Anton.SuccessText else if (del) Anton.DangerText else Anton.TextSecondary
-    if (!isCode(path)) return AnnotatedString(text, SpanStyle(color = base))
+    val lang = langOf(path) ?: return AnnotatedString(text, SpanStyle(color = base))
+    val tok = tokenRe(lang)
     return buildAnnotatedString {
         append(text)
         addStyle(SpanStyle(color = base), 0, text.length)
-        var index = 0
-        for (m in TOKEN.findAll(text)) {
-            // Skip a match that sits inside an earlier string/comment span.
+        var index = 0  // earliest position still eligible for keyword spans (past strings/comments)
+        for (m in tok.findAll(text)) {
             if (m.range.first < index) continue
             val color = when {
-                m.groups[1] != null || m.groups[2] != null -> Anton.TextTertiary.copy(alpha = .7f) // comment
-                m.groups[3] != null || m.groups[4] != null -> Anton.SuccessText                    // string/char
-                m.groups[5] != null -> Anton.AccentHover                                           // @annotation
-                else -> Anton.WarningText                                                          // number
+                m.groups[1] != null -> Anton.TextTertiary.copy(alpha = .7f) // comment
+                m.groups[2] != null -> Anton.SuccessText                    // string
+                m.groups[3] != null -> Anton.AccentHover                    // decorator
+                else -> Anton.WarningText                                   // number
             }
             addStyle(SpanStyle(color = color), m.range.first, m.range.last + 1)
-            if (m.groups[1] != null || m.groups[2] != null || m.groups[3] != null || m.groups[4] != null) index = m.range.last + 1
+            if (m.groups[1] != null || m.groups[2] != null) index = m.range.last + 1
         }
-        for (m in KW.findAll(text)) if (m.range.first >= index) addStyle(SpanStyle(color = Anton.AccentHover), m.range.first, m.range.last + 1)
+        kwRe(lang)?.let { kw ->
+            for (m in kw.findAll(text)) if (m.range.first >= index) addStyle(SpanStyle(color = Anton.AccentHover), m.range.first, m.range.last + 1)
+        }
     }
 }

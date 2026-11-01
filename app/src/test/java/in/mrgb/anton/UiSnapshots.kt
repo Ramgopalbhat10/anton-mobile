@@ -129,6 +129,16 @@ private val threadMessages = listOf(
 
 private val diffFiles = listOf(
     FileDiff(
+        "scripts/etl.py", "M", added = 6, removed = 3,
+        lines = listOf(
+            DiffLine(DiffLine.Kind.Hunk, 0, "@@ -12,6 +12,9 @@ def load()"),
+            DiffLine(DiffLine.Kind.Context, 12, "    rows = read_csv(path)  # source table"),
+            DiffLine(DiffLine.Kind.Remove, 13, "    return rows"),
+            DiffLine(DiffLine.Kind.Add, 13, "    return [r for r in rows if r.ok]"),
+            DiffLine(DiffLine.Kind.Add, 14, "    assert len(rows) > 0, \"empty input\""),
+        ),
+    ),
+    FileDiff(
         "app/ui/screens/CheckoutScreen.kt", "M", added = 26, removed = 8,
         lines = listOf(
             DiffLine(DiffLine.Kind.Hunk, 0, "@@ -41,6 +41,9 @@ fun CheckoutScreen()"),
