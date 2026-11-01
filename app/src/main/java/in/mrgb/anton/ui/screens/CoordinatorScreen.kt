@@ -55,8 +55,13 @@ fun CoordinatorScreen(
                             when (p.type) {
                                 "thread" -> ThreadCard(p)
                                 "file" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                    if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, p.title ?: "Image", height = 120.dp, caption = false)
-                                    else FileChip(p.title ?: p.path?.substringAfterLast('/') ?: "attachment", p.mediaType)
+                                    val name = p.title ?: p.path?.substringAfterLast('/') ?: "attachment"
+                                    val viewer = LocalViewer.current
+                                    if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, name, height = 120.dp, caption = false)
+                                    else FileChip(
+                                        name, p.mediaType,
+                                        onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name, u)), 0) } },
+                                    )
                                 }
                                 else -> UserMessage(m.copy(parts = listOf(p)))
                             }

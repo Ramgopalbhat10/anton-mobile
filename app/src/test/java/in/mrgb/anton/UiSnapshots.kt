@@ -25,6 +25,8 @@ import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.AntonComposer
 import `in`.mrgb.anton.ui.components.Badge
+import `in`.mrgb.anton.ui.components.Artifact
+import `in`.mrgb.anton.ui.components.ArtifactPanel
 import `in`.mrgb.anton.ui.components.FileChip
 import `in`.mrgb.anton.ui.components.SectionLabel
 import `in`.mrgb.anton.ui.components.SelectChip
@@ -262,6 +264,14 @@ class UiSnapshots {
             BottomBar(selected = 0, onNav = {})
             Box(Modifier.padding(top = 4.dp)) { BottomBar(selected = 2, onNav = {}) }
         }
+    }
+
+    @Test
+    fun artifactViewer() = snap {
+        ArtifactPanel(
+            items = listOf(Artifact("report.md", "/out/report.md"), Artifact("index.html", "/out/index.html"), Artifact("data.bin", "/out/data.bin")),
+            start = 1, onDismiss = {},
+        )
     }
 
     @Test

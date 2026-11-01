@@ -319,7 +319,8 @@ fun WorkCard(
                 Modifier.fillMaxWidth().hairlineTop(Anton.CardBorder)
                     // The rail: one line the step marks sit on.
                     .drawBehind {
-                        val x = 20.dp.toPx()
+                        // centred under the 24dp step marks (10dp padding + half a mark)
+                        val x = 22.dp.toPx()
                         drawRect(Anton.BorderDefault, Offset(x - 0.5.dp.toPx(), 16.dp.toPx()), androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height - 32.dp.toPx()))
                     }
                     .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
@@ -484,7 +485,7 @@ private fun AgentStep(p: PartDto) {
         if (open) {
             val shape = RoundedCornerShape(9.dp)
             Column(
-                Modifier.padding(start = 30.dp, top = 2.dp, bottom = 6.dp).fillMaxWidth().clip(shape)
+                Modifier.padding(top = 2.dp, bottom = 6.dp).fillMaxWidth().clip(shape)
                     .background(Anton.WellBg).border(1.dp, Anton.WellBorder, shape).padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {

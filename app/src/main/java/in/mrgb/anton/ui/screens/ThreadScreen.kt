@@ -236,7 +236,11 @@ private fun PartView(p: PartDto) {
         "thread" -> ThreadCard(p)
         "file" -> (p.title ?: p.path)?.let { name ->
             val image = p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()
-            FileChip(name.substringAfterLast('/'), p.mediaType, imageUrl = if (image) p.url else null)
+            val viewer = LocalViewer.current
+            FileChip(
+                name.substringAfterLast('/'), p.mediaType, imageUrl = if (image) p.url else null,
+                onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name.substringAfterLast('/'), u)), 0) } },
+            )
         }
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
     }
