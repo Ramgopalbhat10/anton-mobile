@@ -1,6 +1,7 @@
 package `in`.mrgb.anton.ui.components
 
 import android.content.ClipData
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -9,6 +10,7 @@ import android.util.Base64
 import android.util.LruCache
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -277,16 +279,36 @@ private fun HtmlView(html: String) {
         factory = { context ->
             WebView(context).apply {
                 settings.javaScriptEnabled = true
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        return true
-                    }
-                }
+                webViewClient = ArtifactLinkClient(context)
                 loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
             }
         },
     )
+}
+
+/** Consume even unsupported links so the HTML preview stays open instead of navigating away. */
+internal class ArtifactLinkClient(
+    private val context: Context,
+    private val onError: (String) -> Unit = { toast(context, it) },
+) : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView?, url: String): Boolean {
+        openArtifactLink(context, url, onError)
+        return true
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest): Boolean =
+        shouldOverrideUrlLoading(view, request.url.toString())
+}
+
+/** Launch directly and catch failures: a preflight resolver can race or be hidden by visibility. */
+internal fun openArtifactLink(context: Context, url: String, onError: (String) -> Unit = { toast(context, it) }) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (_: ActivityNotFoundException) {
+        onError("No app can open this link")
+    } catch (_: SecurityException) {
+        onError("Couldn't open this link")
+    }
 }
 
 /** The file the slider can't preview: an offer to open it on the web or save it. */
@@ -305,7 +327,7 @@ private fun ArtifactFallback(store: ImageStore?, a: Artifact, context: Context, 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             store?.let { s ->
                 AntonButton("Open in web", variant = ButtonVariant.Outline, size = ButtonSize.Sm, icon = Lucide.ExternalLink,
-                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(s.absolute(a.url)))) })
+                    onClick = { openArtifactLink(context, s.absolute(a.url)) })
             }
             AntonButton("Download", variant = ButtonVariant.Outline, size = ButtonSize.Sm, icon = Lucide.Download,
                 onClick = onDownload)
