@@ -16,6 +16,8 @@ import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.ScreenOrientation
 import `in`.mrgb.anton.data.api.AskOptionDto
 import `in`.mrgb.anton.data.api.CheckRunDto
+import `in`.mrgb.anton.data.api.DiffLine
+import `in`.mrgb.anton.data.api.FileDiff
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
@@ -27,6 +29,8 @@ import `in`.mrgb.anton.ui.components.AntonComposer
 import `in`.mrgb.anton.ui.components.Badge
 import `in`.mrgb.anton.ui.components.Artifact
 import `in`.mrgb.anton.ui.components.ArtifactPanel
+import `in`.mrgb.anton.ui.components.ChangesPanel
+import `in`.mrgb.anton.ui.components.DiffCard
 import `in`.mrgb.anton.ui.components.FileChip
 import `in`.mrgb.anton.ui.components.SectionLabel
 import `in`.mrgb.anton.ui.components.SelectChip
@@ -123,6 +127,38 @@ private val threadMessages = listOf(
     MessageDto("a2", "assistant", parts = listOf(PartDto(type = "text", text = "The [expense tracker](#thread-61f554e3) is ready, with a dashboard, budget tracking, and CSV export."))),
 )
 
+private val diffFiles = listOf(
+    FileDiff(
+        "app/ui/screens/CheckoutScreen.kt", "M", added = 26, removed = 8,
+        lines = listOf(
+            DiffLine(DiffLine.Kind.Hunk, 0, "@@ -41,6 +41,9 @@ fun CheckoutScreen()"),
+            DiffLine(DiffLine.Kind.Context, 41, "    ) {"),
+            DiffLine(DiffLine.Kind.Context, 42, "        Column("),
+            DiffLine(DiffLine.Kind.Remove, 43, "            Modifier.padding(16.dp),"),
+            DiffLine(DiffLine.Kind.Add, 43, "            Modifier.padding(Space.gutter),"),
+            DiffLine(DiffLine.Kind.Add, 44, "            verticalArrangement = Arrangement"),
+            DiffLine(DiffLine.Kind.Add, 45, "                .spacedBy(Space.turn),"),
+            DiffLine(DiffLine.Kind.Context, 46, "        ) {"),
+            DiffLine(DiffLine.Kind.Hunk, 0, "@@ -88,7 +91,6 @@ fun CheckoutScreen()"),
+            DiffLine(DiffLine.Kind.Context, 91, "        AntonCard(Modifier.fillMaxWidth()) {"),
+            DiffLine(DiffLine.Kind.Remove, 92, "            Text(total, style = Type.H2)"),
+            DiffLine(DiffLine.Kind.Add, 92, "            Text(total, style = Type.Title)"),
+        ),
+    ),
+    FileDiff("app/ui/theme/Theme.kt", "M", added = 14, removed = 2, lines = listOf(DiffLine(DiffLine.Kind.Hunk, 0, "@@ -10,2 +10,3 @@"))),
+    FileDiff(
+        "app/src/test/SpacingTest.kt", "A", added = 8, removed = 0,
+        lines = listOf(
+            DiffLine(DiffLine.Kind.Hunk, 0, "@@ -0,0 +1,8 @@ new file"),
+            DiffLine(DiffLine.Kind.Add, 1, "@Test"),
+            DiffLine(DiffLine.Kind.Add, 2, "fun spacingScale() {"),
+            DiffLine(DiffLine.Kind.Add, 3, "    assertEquals(18.dp, Space.gutter)"),
+            DiffLine(DiffLine.Kind.Add, 4, "}"),
+        ),
+    ),
+    FileDiff("app/ui/util/LegacyPadding.kt", "D", added = 0, removed = 2, lines = emptyList()),
+)
+
 private val prJson = Json.parseToJsonElement(
     """{"url":"https://github.com/Ramgopalbhat10/anton-v2/pull/134","state":"open","number":134,"title":"Improve projects screen","checks":"passing"}""",
 ).jsonObject
@@ -188,6 +224,7 @@ class UiSnapshots {
         ThreadScreen(
             bundle = SessionBundleDto(session = tasks[2], pullRequest = prJson),
             messages = threadMessages,
+            diffs = diffFiles,
             models = models, reasoning = null, sending = false,
             webUrl = "https://code.mrgb.in",
             onBack = {}, onSend = {}, onAbort = {}, onStop = {},
@@ -264,6 +301,11 @@ class UiSnapshots {
             BottomBar(selected = 0, onNav = {})
             Box(Modifier.padding(top = 4.dp)) { BottomBar(selected = 2, onNav = {}) }
         }
+    }
+
+    @Test
+    fun changesView() = snap {
+        ChangesPanel(files = diffFiles, onDismiss = {})
     }
 
     @Test

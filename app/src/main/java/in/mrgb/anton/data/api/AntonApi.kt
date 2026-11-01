@@ -129,6 +129,10 @@ class AntonApi(private val config: () -> ServerConfig) {
         runCatching { Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
             .getOrNull()?.takeIf { it.isNotEmpty() } ?: messages(id)
 
+    /** The task's workspace diff as a unified patch — the same route the web's Changes tab reads. */
+    suspend fun sessionChanges(id: String, branch: Boolean = false): ChangesResponse =
+        get("/api/sessions/$id/changes" + if (branch) "?scope=branch" else "")
+
     /** The full session row, for what the facade trims off (its reasoning level). */
     suspend fun sessionReasoning(id: String): String? =
         get<JsonObject>("/api/sessions/$id")["reasoning"].str()

@@ -24,6 +24,7 @@ import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import `in`.mrgb.anton.data.api.Attachments
+import `in`.mrgb.anton.data.api.FileDiff
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.Outputs
 import `in`.mrgb.anton.data.api.ModelDto
@@ -44,6 +45,7 @@ val LocalAnswer = staticCompositionLocalOf<((String) -> Unit)?> { null }
 fun ThreadScreen(
     bundle: SessionBundleDto?,
     messages: List<MessageDto>,
+    diffs: List<FileDiff>,
     models: List<ModelDto>,
     reasoning: String?,
     sending: Boolean,
@@ -57,6 +59,7 @@ fun ThreadScreen(
 ) {
     val s = bundle?.session
     var menu by remember { mutableStateOf(false) }
+    var showDiffs by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(
@@ -92,6 +95,7 @@ fun ThreadScreen(
                 }
             }
         }
+        if (showDiffs) ChangesView(diffs) { showDiffs = false }
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
         // Keep the tail of the transcript visible as messages arrive and stream in.
         val tailSize = messages.size + messages.lastOrNull().let { m -> m?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
@@ -107,6 +111,7 @@ fun ThreadScreen(
                 items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
                     if (m.role == "user") UserMessage(m) else AgentMessage(m, live = s?.working == true && m === lastAgent)
                 }
+                if (diffs.isNotEmpty()) item { DiffCard(diffs) { showDiffs = true } }
                 bundle?.pullRequest?.let { pr -> item { PrCard(pr, s) } }
                 bundle?.waiting?.lastOrNull()?.let { w ->
                     item { QueuedNote(w.text) }

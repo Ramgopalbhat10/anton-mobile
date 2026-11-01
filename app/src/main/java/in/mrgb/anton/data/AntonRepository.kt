@@ -30,6 +30,13 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun messages(id: String): List<MessageDto> = api.threadMessages(id)
 
+    /** The task's file diffs: the unpushed changes, or the whole branch when nothing was pushed. */
+    suspend fun sessionDiffs(id: String): List<`in`.mrgb.anton.data.api.FileDiff> {
+        val unpushed = api.sessionChanges(id)
+        if (unpushed.patch.isNotBlank()) return `in`.mrgb.anton.data.api.parsePatch(unpushed.patch)
+        return `in`.mrgb.anton.data.api.parsePatch(api.sessionChanges(id, branch = true).patch)
+    }
+
     suspend fun spaces(): List<SpaceDto> = api.spaces()
 
     suspend fun space(id: String): SpaceDetailDto = api.space(id)

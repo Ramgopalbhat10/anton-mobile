@@ -45,6 +45,8 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val bundle = _bundle.asStateFlow()
     private val _messages = MutableStateFlow<List<MessageDto>>(emptyList())
     val messages = _messages.asStateFlow()
+    private val _diffs = MutableStateFlow<List<`in`.mrgb.anton.data.api.FileDiff>>(emptyList())
+    val diffs = _diffs.asStateFlow()
     private val _models = MutableStateFlow<List<ModelDto>>(emptyList())
     val models = _models.asStateFlow()
     val sending = MutableStateFlow(false)
@@ -72,6 +74,7 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     fun refresh() = viewModelScope.launch {
         runCatching { repo.session(sessionId) }.onSuccess { _bundle.value = it }.onFailure { error.value = it.message }
         runCatching { repo.messages(sessionId) }.onSuccess { _messages.value = it }
+        runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
     }
 
     fun loadModels() = viewModelScope.launch {

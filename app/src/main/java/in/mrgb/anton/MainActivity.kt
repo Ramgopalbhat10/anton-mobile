@@ -153,6 +153,7 @@ private fun App() {
             ThreadScreen(
                 bundle = vm.bundle.collectAsState().value,
                 messages = vm.messages.collectAsState().value,
+                diffs = vm.diffs.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
