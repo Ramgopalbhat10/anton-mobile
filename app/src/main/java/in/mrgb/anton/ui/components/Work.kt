@@ -264,10 +264,12 @@ fun WorkCard(
     parts: List<PartDto>,
     live: Boolean,
     durationMs: Long?,
+    narration: @Composable (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(live) }
     LaunchedEffect(live) { open = live }
     val steps = parts.filter { it.type in STEP_TYPES }
+    val lastText = parts.indexOfLast { it.type == "text" }
     val agents = steps.filter { it.name == "task" }
     val chevron by animateFloatAsState(if (open) 180f else 0f, tween(180), label = "chev")
     val shape = RoundedCornerShape(12.dp)
@@ -307,18 +309,19 @@ fun WorkCard(
                     .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                parts.forEach { p ->
+                parts.forEachIndexed { index, p ->
                     when {
                         p.type == "reasoning" -> ThoughtStep(p)
                         p.type == "tool" && p.name == "task" -> AgentStep(p)
                         p.type == "tool" -> ToolStep(p)
-                        p.type == "text" -> NarrationStep {
+                        p.type == "text" && index == lastText -> NarrationStep {
                             Text(
                                 "Rendered \u2018${plainLine(p.text)}\u2019",
                                 style = Type.Small.copy(lineHeight = 20.sp), color = Anton.TextTertiary,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        p.type == "text" -> NarrationStep { narration(p.text.orEmpty().trim()) }
                     }
                 }
             }
