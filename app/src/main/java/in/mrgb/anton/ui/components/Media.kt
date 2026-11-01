@@ -145,6 +145,9 @@ fun MediaHost(images: ImageStore?, content: @Composable () -> Unit) {
 }
 
 /** An image from the server or a data URL; a quiet tile while it loads, a broken-image mark if it can't. */
+// AGP 8.7/Kotlin 2 lint misresolves keyed produceState despite the value assignment below.
+// Remove after a toolchain upgrade: https://issuetracker.google.com/issues/368420773
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun RemoteImage(
     url: String,
@@ -155,7 +158,9 @@ fun RemoteImage(
 ) {
     val store = LocalImages.current
     val state by produceState<Any?>(store?.cached(url, maxPx), url, maxPx, store) {
-        if (value == null) value = store?.let { runCatching { it.load(url, maxPx) }.getOrNull() } ?: false
+        value = store?.cached(url, maxPx)
+            ?: store?.let { runCatching { it.load(url, maxPx) }.getOrNull() }
+            ?: false
     }
     when (val s = state) {
         is ImageBitmap -> Image(s, contentDescription, modifier, contentScale = contentScale)

@@ -48,13 +48,57 @@ Create the token in Zero Trust → Access → Service Auth → Service Tokens, a
 
 ## Build
 
-Requires Android Studio (AGP 8.7+, Kotlin 2.0) or `gradle` with an Android SDK on PATH:
+### Toolchain
 
-```
-./gradlew :app:assembleDebug
+- JDK **17** (`java -version`)
+- Android SDK command-line tools, **platform 35**, and **build-tools 34.0.0**
+- Gradle **8.11.1**, downloaded and checksum-verified by the checked-in wrapper
+- AGP **8.7.3** and Kotlin **2.0.21**, pinned in `gradle/libs.versions.toml`
+
+Android Studio is optional. For a headless Linux sandbox, install JDK 17 and extract the [Android SDK command-line tools](https://developer.android.com/tools/sdkmanager) into `$ANDROID_HOME/cmdline-tools/latest`, then run:
+
+```sh
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 # adjust for your JDK installation
+export ANDROID_HOME=/opt/android-sdk             # adjust for your SDK installation
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+sdkmanager --licenses
+sdkmanager "platforms;android-35" "build-tools;34.0.0" "platform-tools"
+./gradlew :app:assembleRelease --max-workers=2
 ```
 
-Set `local.properties` → `sdk.dir=` if the SDK isn't detected.
+Alternatively, set `sdk.dir=/absolute/path/to/android-sdk` in the ignored `local.properties`. The wrapper scripts and JAR are included; no system Gradle installation is needed.
+
+### APK variants and signing
+
+- `./gradlew :app:assembleDebug` produces a debug-signed APK at `app/build/outputs/apk/debug/app-debug.apk`. This variant includes development tooling and is **not** the small distribution artifact.
+- `./gradlew :app:assembleRelease` enables R8 minification and resource shrinking, producing `app/build/outputs/apk/release/app-release-unsigned.apk`. Measure the **signed release APK** when checking the roughly **1.7 MB** size target; the exact size depends on the source and toolchain.
+
+Release signing is deliberately not configured with a checked-in key. To create an installable sandbox build, generate a local test key outside the repository and sign the optimized APK:
+
+```sh
+# Test key only; do not use this public password/key identity for production releases.
+keytool -genkeypair -keystore /tmp/anton-sandbox.p12 -storetype PKCS12 \
+  -storepass android -keypass android -alias anton-sandbox -keyalg RSA \
+  -keysize 2048 -validity 3650 -dname "CN=Anton Sandbox"
+"$ANDROID_HOME/build-tools/34.0.0/zipalign" -f -p 4 \
+  app/build/outputs/apk/release/app-release-unsigned.apk /tmp/anton-aligned.apk
+"$ANDROID_HOME/build-tools/34.0.0/apksigner" sign \
+  --ks /tmp/anton-sandbox.p12 --ks-key-alias anton-sandbox \
+  --ks-pass pass:android --key-pass pass:android --v4-signing-enabled false \
+  --out /tmp/anton-release.apk /tmp/anton-aligned.apk
+"$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose /tmp/anton-release.apk
+"$ANDROID_HOME/build-tools/34.0.0/zipalign" -c -v 4 /tmp/anton-release.apk
+```
+
+Keep a real release keystore securely outside the repository and reuse it for updates. A sandbox-key APK cannot update an existing installation signed with another key. The tracked `.idsig` file is not an APK and is not used by this build.
+
+### Checks
+
+```sh
+./gradlew :app:testDebugUnitTest :app:verifyPaparazziDebug :app:lintRelease --max-workers=2
+```
+
+Paparazzi runs the UI snapshot tests on the JVM, without an emulator. Snapshot references live in `app/src/test/snapshots/`; do not overwrite them just to make a failing verification pass.
 
 ## Not yet wired
 

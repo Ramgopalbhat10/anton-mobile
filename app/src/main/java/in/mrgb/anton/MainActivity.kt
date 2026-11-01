@@ -70,7 +70,7 @@ private fun App() {
     var newTask by remember { mutableStateOf(false) }
     val screen = back.last()
     val push: (Screen) -> Unit = { back.add(it) }
-    BackHandler(enabled = back.size > 1) { back.removeLast() }
+    BackHandler(enabled = back.size > 1) { back.removeAt(back.lastIndex) }
 
     val tabIndex = when (screen) {
         is Screen.Tasks -> 0
@@ -126,7 +126,7 @@ private fun App() {
             ProjectDetailScreen(
                 space = vm.detail.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
-                onBack = { back.removeLast() },
+                onBack = { back.removeAt(back.lastIndex) },
                 onOpenThread = { push(Screen.Thread(it)) },
                 onOpenCoordinator = { push(Screen.Coordinator(s.id, it)) },
             )
@@ -144,7 +144,7 @@ private fun App() {
                 onModel = { model, level -> vm.setCoordinatorModel(s.id, model, level) },
                 onLoadModels = vm::loadModels,
                 onSend = { vm.sendCoordinator(s.id, it) },
-                onBack = { back.removeLast() },
+                onBack = { back.removeAt(back.lastIndex) },
             )
         }
         is Screen.Thread -> {
@@ -157,7 +157,7 @@ private fun App() {
                 reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.sending.collectAsState().value,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
-                onBack = { back.removeLast() },
+                onBack = { back.removeAt(back.lastIndex) },
                 onSend = vm::send,
                 onAbort = vm::abort,
                 onStop = vm::stop,
