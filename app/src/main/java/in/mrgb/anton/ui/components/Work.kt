@@ -237,39 +237,18 @@ private val STEP_TYPES = setOf("reasoning", "tool")
 private fun PartDto.running() = state == "input-available" || state == "input-streaming" || state == "streaming"
 private fun PartDto.failed() = state == "output-error"
 
-/** A reply laid out like the web's toBlocks: each run of steps its own card, its words real replies. */
-sealed interface ReplyBlock {
-    class Steps(val steps: List<PartDto>) : ReplyBlock
-    class Agents(val calls: List<PartDto>) : ReplyBlock
-    class Single(val part: PartDto) : ReplyBlock
-}
-
 /**
- * Groups a reply's parts: a text part always breaks the run and renders as a
- * real response; `task` calls stand alone as agent cards; reasoning and other
- * tools join the run they belong to. Everything else keeps its place.
+ * One parent card for the whole turn: everything up to and including the last
+ * step part — thoughts, tools, task calls, and the words between them — sits
+ * on its rail; only what the reply says after the last step is its real
+ * response, rendered outside. Returns (work on the rail, parts shown after).
  */
-fun replyBlocks(parts: List<PartDto>): List<ReplyBlock> {
-    val blocks = mutableListOf<ReplyBlock>()
-    for (p in parts) {
-        when {
-            p.type == "text" -> {
-                if (!p.text.isNullOrBlank()) blocks += ReplyBlock.Single(p)
-            }
-            p.type == "tool" && p.name == "task" -> {
-                val last = blocks.lastOrNull()
-                if (last is ReplyBlock.Agents) (last.calls as MutableList) += p
-                else blocks += ReplyBlock.Agents(mutableListOf(p))
-            }
-            p.type in STEP_TYPES -> {
-                val last = blocks.lastOrNull()
-                if (last is ReplyBlock.Steps) (last.steps as MutableList) += p
-                else blocks += ReplyBlock.Steps(mutableListOf(p))
-            }
-            else -> blocks += ReplyBlock.Single(p)
-        }
-    }
-    return blocks
+fun splitReply(parts: List<PartDto>): Pair<List<PartDto>, List<PartDto>> {
+    val lastWork = parts.indexOfLast { it.type in STEP_TYPES }
+    if (lastWork < 0) return emptyList<PartDto>() to parts
+    val work = parts.take(lastWork + 1).filter { it.type in STEP_TYPES || it.type == "text" }
+    val outside = parts.filterIndexed { i, p -> i > lastWork || (p.type !in STEP_TYPES && p.type != "text") }
+    return work to outside
 }
 
 /**
@@ -428,16 +407,6 @@ private fun ToolStep(p: PartDto) {
                     .verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) { Text(text, style = Type.Code.copy(fontSize = 12.sp, lineHeight = 18.sp), color = Anton.TextSecondary, softWrap = false) }
-        }
-    }
-}
-
-/** A batch of `task` calls between step runs: one card of agent rows, like the web's AgentsBlock. */
-@Composable
-fun AgentsCard(calls: List<PartDto>) {
-    AntonCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 8.dp)) {
-            calls.forEach { AgentStep(it) }
         }
     }
 }
