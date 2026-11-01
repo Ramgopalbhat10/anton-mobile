@@ -186,6 +186,9 @@ fun ArtifactViewer(items: List<Artifact>, start: Int, onDismiss: () -> Unit) {
 }
 
 /** The slider's panel — apart from the dialog so snapshots can render it. */
+// Same keyed-produceState lint false positive as RemoteImage; value is assigned below.
+// Remove after a toolchain upgrade: https://issuetracker.google.com/issues/368420773
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     var index by remember { mutableIntStateOf(start.coerceIn(0, items.lastIndex)) }
