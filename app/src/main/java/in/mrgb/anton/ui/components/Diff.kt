@@ -133,7 +133,7 @@ private fun DiffFileSection(file: FileDiff, expanded: Boolean, onToggle: () -> U
             }
             DiffNums(file.added, file.removed, fontSize = 11.5.sp)
             Badge(
-                when (file.status) { "A" -> "Added"; "D" -> "Deleted"; else -> "Modified" },
+                file.status,
                 when (file.status) { "A" -> Tone.Success; "D" -> Tone.Danger; else -> Tone.Accent },
             )
         }
