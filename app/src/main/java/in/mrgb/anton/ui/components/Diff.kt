@@ -3,9 +3,11 @@ package `in`.mrgb.anton.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -32,6 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,40 +147,75 @@ private fun DiffFileSection(file: FileDiff, expanded: Boolean, onToggle: () -> U
     }
 }
 
-/** The file's hunks and rows: number, +/−/space sign, and tinted text. */
+/** The file's hunks and rows: number, +/−/space sign, syntax-tinted text; scrolls sideways as one. */
 @Composable
 private fun DiffLines(file: FileDiff) {
     Column(Modifier.fillMaxWidth().background(Anton.WellBg).padding(bottom = 6.dp)) {
-        file.lines.forEach { line ->
-            when (line.kind) {
-                DiffLine.Kind.Hunk -> Text(
-                    line.text, style = Type.Code.copy(fontSize = 10.5.sp), color = Anton.TextTertiary,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 10.dp).padding(top = 7.dp, bottom = 3.dp),
-                )
-                else -> {
-                    val add = line.kind == DiffLine.Kind.Add
-                    val del = line.kind == DiffLine.Kind.Remove
-                    Row(Modifier.fillMaxWidth().background(if (add) AddBg else if (del) DelBg else Color.Transparent)) {
-                        Text(
-                            if (line.number > 0) "${line.number}" else "", style = Type.Num.copy(fontSize = 10.sp), color = Anton.TextTertiary.copy(alpha = .55f),
-                            modifier = Modifier.width(34.dp).padding(end = 8.dp, top = 1.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+        // One shared horizontal scroll across the whole file so rows move together.
+        Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            Column(Modifier.width(IntrinsicSize.Max)) {
+                file.lines.forEach { line ->
+                    when (line.kind) {
+                        DiffLine.Kind.Hunk -> Text(
+                            line.text, style = Type.Code.copy(fontSize = 10.5.sp), color = Anton.TextTertiary,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 10.dp).padding(top = 7.dp, bottom = 3.dp),
                         )
-                        Text(
-                            if (add) "+" else if (del) "−" else " ", style = Type.Code.copy(fontSize = 11.sp),
-                            color = if (add) Anton.Success else if (del) Anton.Danger else Anton.TextTertiary,
-                            modifier = Modifier.width(13.dp),
-                        )
-                        Text(
-                            line.text, style = Type.Code.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                            color = if (add) Anton.SuccessText else if (del) Anton.DangerText else Anton.TextSecondary,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 10.dp),
-                        )
+                        else -> {
+                            val add = line.kind == DiffLine.Kind.Add
+                            val del = line.kind == DiffLine.Kind.Remove
+                            Row(Modifier.background(if (add) AddBg else if (del) DelBg else Color.Transparent)) {
+                                Text(
+                                    if (line.number > 0) "${line.number}" else "", style = Type.Num.copy(fontSize = 10.sp), color = Anton.TextTertiary.copy(alpha = .55f),
+                                    modifier = Modifier.width(34.dp).padding(end = 8.dp, top = 1.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                )
+                                Text(
+                                    if (add) "+" else if (del) "−" else " ", style = Type.Code.copy(fontSize = 11.sp),
+                                    color = if (add) Anton.Success else if (del) Anton.Danger else Anton.TextTertiary,
+                                    modifier = Modifier.width(13.dp),
+                                )
+                                Text(
+                                    remember(line.text, file.path) { highlight(line.text, file.path, add, del) },
+                                    style = Type.Code.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                                    maxLines = 1, softWrap = false, modifier = Modifier.padding(end = 10.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
         if (file.lines.isEmpty()) Text("Binary file", style = Type.Meta, color = Anton.TextTertiary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    }
+}
+
+/* ── Tiny syntax highlighter — Kotlin/Java only, plain text elsewhere. ── */
+
+private val KW = Regex("\\b(package|import|fun|val|var|class|interface|object|return|if|else|when|for|while|do|try|catch|finally|throw|is|in|as|by|constructor|init|this|super|null|true|false|data|sealed|enum|companion|private|public|internal|protected|override|abstract|open|suspend|inline|typealias|new|final|static|extends|implements|void|int|long|boolean|double|float|char|byte|short)\\b")
+private val TOKEN = Regex("(//.*$)|(/\\*.*?\\*/)|(\"(?:\\\\.|[^\"\\\\])*\")|('(?:\\\\.|[^'\\\\])')|(@\\w+)|\\b(0x[0-9a-fA-F]+|\\d+(?:\\.\\d+)?[fLl]?)\\b")
+
+private fun isCode(path: String) = path.substringAfterLast('.', "").lowercase() in setOf("kt", "kts", "java")
+
+private fun highlight(text: String, path: String, add: Boolean, del: Boolean): AnnotatedString {
+    val base = if (add) Anton.SuccessText else if (del) Anton.DangerText else Anton.TextSecondary
+    if (!isCode(path)) return AnnotatedString(text, SpanStyle(color = base))
+    return buildAnnotatedString {
+        append(text)
+        addStyle(SpanStyle(color = base), 0, text.length)
+        var index = 0
+        for (m in TOKEN.findAll(text)) {
+            // Skip a match that sits inside an earlier string/comment span.
+            if (m.range.first < index) continue
+            val color = when {
+                m.groups[1] != null || m.groups[2] != null -> Anton.TextTertiary.copy(alpha = .7f) // comment
+                m.groups[3] != null || m.groups[4] != null -> Anton.SuccessText                    // string/char
+                m.groups[5] != null -> Anton.AccentHover                                           // @annotation
+                else -> Anton.WarningText                                                          // number
+            }
+            addStyle(SpanStyle(color = color), m.range.first, m.range.last + 1)
+            if (m.groups[1] != null || m.groups[2] != null || m.groups[3] != null || m.groups[4] != null) index = m.range.last + 1
+        }
+        for (m in KW.findAll(text)) if (m.range.first >= index) addStyle(SpanStyle(color = Anton.AccentHover), m.range.first, m.range.last + 1)
     }
 }

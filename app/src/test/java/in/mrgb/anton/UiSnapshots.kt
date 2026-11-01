@@ -143,6 +143,7 @@ private val diffFiles = listOf(
             DiffLine(DiffLine.Kind.Context, 91, "        AntonCard(Modifier.fillMaxWidth()) {"),
             DiffLine(DiffLine.Kind.Remove, 92, "            Text(total, style = Type.H2)"),
             DiffLine(DiffLine.Kind.Add, 92, "            Text(total, style = Type.Title)"),
+            DiffLine(DiffLine.Kind.Add, 93, "            Text(\"Total paid: \$total — saved to ledger\", style = Type.Meta, color = Anton.TextTertiary) // summary row"),
         ),
     ),
     FileDiff("app/ui/theme/Theme.kt", "M", added = 14, removed = 2, lines = listOf(DiffLine(DiffLine.Kind.Hunk, 0, "@@ -10,2 +10,3 @@"))),
