@@ -201,20 +201,29 @@ fun UserMessage(m: MessageDto) {
 }
 
 /**
- * A reply: one work card for everything it did (thoughts, tools, subagents
- * and the words between them), then its answer, then what it made for you.
+ * A reply laid out like the web: each run of steps its own "Worked" card, the
+ * words between runs rendered as real responses, subagent calls their own
+ * cards, then what it made for you.
  */
 @Composable
 fun AgentMessage(m: MessageDto, live: Boolean = false) {
-    val (work, rest) = remember(m.parts) { splitWork(m.parts) }
+    val blocks = remember(m.parts) { replyBlocks(m.parts) }
     val outputs = remember(m.parts) { Outputs.ofReply(m.parts) }
+    val firstSteps = blocks.indexOfFirst { it is ReplyBlock.Steps }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (work.isNotEmpty()) {
-            WorkCard(work, live = live, durationMs = m.durationMs) { text ->
-                Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
+        blocks.forEachIndexed { index, block ->
+            when (block) {
+                is ReplyBlock.Steps -> WorkCard(
+                    block.steps,
+                    live = live && index == blocks.lastIndex,
+                    durationMs = if (index == firstSteps) m.durationMs else null,
+                ) { text ->
+                    Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
+                }
+                is ReplyBlock.Agents -> AgentsCard(block.calls)
+                is ReplyBlock.Single -> PartView(block.part)
             }
         }
-        rest.forEach { PartView(it) }
         if (outputs.isNotEmpty()) ReplyOutputs(outputs)
     }
 }

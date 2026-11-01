@@ -110,8 +110,11 @@ private val threadMessages = listOf(
         "a1", "assistant", parts = listOf(
             PartDto(type = "reasoning", text = "The user wants a Cloudflare-blog-style diagram in pure SVG, no raster images. I'll hand-write the SVG with their palette."),
             PartDto(type = "tool", name = "write_file", state = "done", title = "Write renders/diagram.svg"),
-            PartDto(type = "tool", name = "run", state = "done", title = "Render PNG to verify"),
             PartDto(type = "text", text = "I've started a thread with your screenshot as the reference. It'll build a sample diagram in pure SVG in the Cloudflare blog style."),
+            PartDto(type = "tool", name = "task", state = "output-available", input = kotlinx.serialization.json.Json.parseToJsonElement("""{"agent":"explorer","prompt":"Inspect Android build requirements","description":"Inspect Android build requirements"}""")),
+            PartDto(type = "tool", name = "run", state = "done", title = "Render PNG to verify"),
+            PartDto(type = "reasoning", text = "Check the exported dimensions match the viewBox."),
+            PartDto(type = "text", text = "The diagram renders correctly — card, nodes and edges match the reference."),
         ),
     ),
     MessageDto("u2", "user", parts = listOf(PartDto(type = "thread", title = "Improve projects screen", state = "idle", text = "Fixed the filename collision and updated **PR #134**."))),
