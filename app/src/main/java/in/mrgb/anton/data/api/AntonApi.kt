@@ -4,6 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -34,21 +37,29 @@ class AntonApi(private val config: () -> ServerConfig) {
     val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        // Network interceptors run for every exchange, including each redirect hop.
+        // Never rely on OkHttp stripping custom authentication headers on redirects.
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            val c = request.tag(ServerConfig::class.java)
+            val origin = c?.normalized?.toHttpUrlOrNull()
+            val safe = request.newBuilder()
+                .removeHeader("CF-Access-Client-Id")
+                .removeHeader("CF-Access-Client-Secret")
+            if (c != null && origin != null && request.url.sameOrigin(origin)) {
+                c.cfClientId.trim().takeIf { it.isNotEmpty() }?.let { safe.header("CF-Access-Client-Id", it) }
+                c.cfClientSecret.trim().takeIf { it.isNotEmpty() }?.let { safe.header("CF-Access-Client-Secret", it) }
+            }
+            chain.proceed(safe.build())
+        }
         .build()
 
     /** SSE needs no read timeout — the stream lives as long as the screen does. */
     val sseHttp = http.newBuilder().readTimeout(0, TimeUnit.SECONDS).build()
 
-    /** Cloudflare Access service auth headers ride on every request, including SSE and uploads. */
-    private fun Request.Builder.withAuth(): Request.Builder {
-        val c = config()
-        val id = c.cfClientId.trim()
-        val secret = c.cfClientSecret.trim()
-        if (id.isNotBlank()) header("CF-Access-Client-Id", id)
-        if (secret.isNotBlank()) header("CF-Access-Client-Secret", secret)
-        header("Accept", "application/json")
-        return this
-    }
+    /** Snapshot credentials for this call; the per-hop origin check attaches them on the wire. */
+    private fun Request.Builder.withAuth(c: ServerConfig = config()): Request.Builder =
+        tag(ServerConfig::class.java, c).header("Accept", "application/json")
 
     fun url(path: String) = config().normalized + path
 
@@ -122,9 +133,14 @@ class AntonApi(private val config: () -> ServerConfig) {
     suspend fun sessionReasoning(id: String): String? =
         get<JsonObject>("/api/sessions/$id")["reasoning"].str()
 
-    /** Bytes of a file the server holds (a Library output, an attachment), with the auth headers. */
+    /** Library/attachment bytes. External URLs are allowed, but never receive server credentials. */
     suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(if (path.startsWith("http")) path else url(path)).withAuth().header("Accept", "*/*").build()
+        val c = config()
+        // App-relative paths must retain a configured reverse-proxy prefix (e.g. /anton).
+        val root = (c.normalized + "/").toHttpUrl()
+        val reference = if (path.startsWith("//")) path else path.removePrefix("/")
+        val target = root.resolve(reference) ?: throw IllegalArgumentException("Invalid file URL")
+        val req = Request.Builder().url(target).withAuth(c).header("Accept", "*/*").build()
         http.newCall(req).execute().use { res ->
             if (!res.isSuccessful) throw ApiError(res.code, "")
             res.body?.bytes() ?: ByteArray(0)
@@ -202,5 +218,9 @@ class AntonApi(private val config: () -> ServerConfig) {
             }
         }
 }
+
+/** A web origin includes the scheme and effective port, not just a hostname prefix. */
+internal fun HttpUrl.sameOrigin(other: HttpUrl): Boolean =
+    scheme == other.scheme && host == other.host && port == other.port
 
 class ApiError(val status: Int, body: String) : Exception("HTTP $status: ${body.take(160)}")

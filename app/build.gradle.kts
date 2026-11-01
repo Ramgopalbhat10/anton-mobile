@@ -70,4 +70,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.markdown.renderer)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
