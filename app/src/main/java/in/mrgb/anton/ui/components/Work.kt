@@ -271,12 +271,12 @@ fun WorkCard(
     val shape = RoundedCornerShape(12.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)) {
         Row(
-            Modifier.fillMaxWidth().clickable { open = !open }.heightIn(min = 40.dp).padding(start = 12.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().clickable { open = !open }.heightIn(min = 44.dp).padding(start = 14.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
                 if (live) Spinner(12.dp)
-                else Icon(Lucide.ChevronDown, if (open) "Collapse" else "Expand", tint = Anton.IconTertiary, modifier = Modifier.size(14.dp).rotate(chevron))
+                else Icon(Lucide.ChevronDown, if (open) "Collapse" else "Expand", tint = Anton.IconTertiary, modifier = Modifier.size(15.dp).rotate(chevron))
             }
             val label = when {
                 live -> steps.lastOrNull()?.let { s -> if (s.type == "reasoning") "Thinking…" else describeTool(s.name.orEmpty(), s.input, s.state, s.output).body.text }
@@ -301,8 +301,8 @@ fun WorkCard(
                         val x = 20.dp.toPx()
                         drawRect(Anton.BorderDefault, Offset(x - 0.5.dp.toPx(), 16.dp.toPx()), androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height - 32.dp.toPx()))
                     }
-                    .padding(start = 8.dp, end = 10.dp, top = 6.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+                    .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 parts.forEach { p ->
                     when {
@@ -336,7 +336,7 @@ private fun StepStrip(steps: List<PartDto>, live: Boolean) {
 /** A step's mark on the rail: it sits over the line so the line runs between steps. */
 @Composable
 private fun Node(size: Dp = 24.dp, content: @Composable BoxScope.() -> Unit) {
-    Box(Modifier.size(width = size, height = 26.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(width = size, height = 30.dp), contentAlignment = Alignment.Center) {
         Box(Modifier.size(18.dp).clip(CircleShape).background(Anton.CardBg), contentAlignment = Alignment.Center, content = content)
     }
 }
@@ -351,14 +351,14 @@ private fun ThoughtStep(p: PartDto) {
             Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).clickable(enabled = text.isNotEmpty()) { open = !open },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Node { Icon(if (open) Lucide.ChevronDown else Lucide.Brain, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp)) }
+            Node { Icon(if (open) Lucide.ChevronDown else Lucide.Brain, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp)) }
             Text(
                 if (p.running()) "Thinking…" else "Thought" + if (words > 0) " · $words words" else "",
                 style = Type.Small, color = Anton.TextTertiary,
             )
         }
         if (open && text.isNotEmpty()) {
-            Text(text, style = Type.Small.copy(lineHeight = 18.sp), color = Anton.TextTertiary, modifier = Modifier.padding(start = 30.dp, end = 4.dp, bottom = 6.dp))
+            Text(text, style = Type.Small.copy(lineHeight = 20.sp), color = Anton.TextTertiary, modifier = Modifier.padding(start = 30.dp, end = 4.dp, bottom = 6.dp))
         }
     }
 }
@@ -382,15 +382,15 @@ private fun ToolStep(p: PartDto) {
             Node {
                 when {
                     running -> Spinner(11.dp)
-                    failed -> Icon(Lucide.CircleAlert, "Failed", tint = Anton.DangerText, modifier = Modifier.size(12.dp))
-                    else -> Icon(look.icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp))
+                    failed -> Icon(Lucide.CircleAlert, "Failed", tint = Anton.DangerText, modifier = Modifier.size(13.dp))
+                    else -> Icon(look.icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp))
                 }
             }
             Text(look.body, style = Type.Small, color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (expandable) Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(12.dp).rotate(chevron))
+            if (expandable) Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(13.dp).rotate(chevron))
         }
         if (failed && !p.errorText.isNullOrBlank()) {
-            Text(p.errorText, style = Type.Small.copy(lineHeight = 17.sp), color = Anton.DangerText, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 30.dp, end = 4.dp, bottom = 4.dp))
+            Text(p.errorText, style = Type.Small.copy(lineHeight = 19.sp), color = Anton.DangerText, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 30.dp, end = 4.dp, bottom = 4.dp))
         }
         if (image.isNotBlank()) place.output(image)?.let { url ->
             ImageCard(url, image, Modifier.padding(start = 30.dp, top = 2.dp, bottom = 6.dp), height = 132.dp, caption = false)
@@ -405,7 +405,7 @@ private fun ToolStep(p: PartDto) {
                     .clip(shape).background(Anton.WellBg).border(1.dp, Anton.WellBorder, shape)
                     .verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())
                     .padding(horizontal = 10.dp, vertical = 8.dp),
-            ) { Text(text, style = Type.Code.copy(fontSize = 11.sp, lineHeight = 16.sp), color = Anton.TextSecondary, softWrap = false) }
+            ) { Text(text, style = Type.Code.copy(fontSize = 12.sp, lineHeight = 18.sp), color = Anton.TextSecondary, softWrap = false) }
         }
     }
 }
@@ -430,24 +430,24 @@ private fun AgentStep(p: PartDto) {
     val answer = run?.result ?: (p.errorText ?: p.output.outputText()).takeIf { it.isNotBlank() }
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }.padding(vertical = 3.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { open = !open }.padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Anton.CardBg).padding(1.dp)) { AgentTile(agent, running, 20.dp) }
             }
             Column(Modifier.weight(1f)) {
-                Text(titleOf(prompt, p.input.field("description").ifBlank { run?.description }), style = Type.SmallMedium.copy(fontSize = 12.5.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(titleOf(prompt, p.input.field("description").ifBlank { run?.description }), style = Type.SmallMedium.copy(fontSize = 13.5.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     if (running) run?.writing?.let(::plainLine)?.ifBlank { null } ?: "$meta · working" else meta,
-                    style = Type.Meta.copy(fontSize = 11.sp), color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = Type.Meta.copy(fontSize = 12.sp), color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
             when (status) {
                 "running" -> Spinner(11.dp)
-                "failed" -> Icon(Lucide.CircleAlert, "Failed", tint = Anton.DangerText, modifier = Modifier.size(13.dp))
-                "stopped" -> Icon(Lucide.CircleStop, "Stopped", tint = Anton.TextTertiary, modifier = Modifier.size(13.dp))
-                else -> Icon(Lucide.Check, "Done", tint = Anton.SuccessText, modifier = Modifier.size(13.dp))
+                "failed" -> Icon(Lucide.CircleAlert, "Failed", tint = Anton.DangerText, modifier = Modifier.size(14.dp))
+                "stopped" -> Icon(Lucide.CircleStop, "Stopped", tint = Anton.TextTertiary, modifier = Modifier.size(14.dp))
+                else -> Icon(Lucide.Check, "Done", tint = Anton.SuccessText, modifier = Modifier.size(14.dp))
             }
         }
         if (open) {
@@ -465,18 +465,18 @@ private fun AgentStep(p: PartDto) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         when (s.state) {
                             "running" -> Spinner(10.dp)
-                            "failed" -> Icon(Lucide.CircleAlert, null, tint = Anton.DangerText, modifier = Modifier.size(11.dp))
-                            else -> Icon(l.icon, null, tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
+                            "failed" -> Icon(Lucide.CircleAlert, null, tint = Anton.DangerText, modifier = Modifier.size(12.dp))
+                            else -> Icon(l.icon, null, tint = Anton.IconDisabled, modifier = Modifier.size(12.dp))
                         }
-                        Text(l.body, style = Type.Small.copy(fontSize = 11.5.sp), color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        s.durationMs?.let { Text(if (it < 1000) "${it}ms" else elapsed(it), style = Type.Num.copy(fontSize = 10.sp), color = Anton.TextDisabled) }
+                        Text(l.body, style = Type.Small.copy(fontSize = 12.5.sp), color = Anton.TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        s.durationMs?.let { Text(if (it < 1000) "${it}ms" else elapsed(it), style = Type.Num.copy(fontSize = 11.sp), color = Anton.TextDisabled) }
                     }
                 }
                 answer?.let {
                     if (steps.isNotEmpty()) Hairline(color = Anton.WellBorder, modifier = Modifier.padding(vertical = 4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Icon(Lucide.CornerDownRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(11.dp).padding(top = 2.dp))
-                        Text(it.trim(), style = Type.Small.copy(lineHeight = 17.sp), color = Anton.TextSecondary, maxLines = 10, overflow = TextOverflow.Ellipsis)
+                        Icon(Lucide.CornerDownRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(12.dp).padding(top = 2.dp))
+                        Text(it.trim(), style = Type.Small.copy(lineHeight = 19.sp), color = Anton.TextSecondary, maxLines = 10, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

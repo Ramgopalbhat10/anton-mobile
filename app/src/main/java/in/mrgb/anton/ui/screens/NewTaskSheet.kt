@@ -63,24 +63,24 @@ fun NewTaskSheet(
     val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "prompt")
     val canStart = prompt.isNotBlank() && !creating
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 16.dp)) {
         val shape = RoundedCornerShape(14.dp)
         Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
             BasicTextField(
                 value = prompt, onValueChange = { prompt = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp).heightIn(min = 72.dp).focusRequester(focus),
-                textStyle = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp, color = Anton.TextPrimary),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 80.dp).focusRequester(focus),
+                textStyle = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp, color = Anton.TextPrimary),
                 cursorBrush = SolidColor(Anton.Accent),
                 maxLines = 10,
                 interactionSource = interaction,
                 decorationBox = { inner ->
-                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp), color = Anton.TextTertiary)
+                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp), color = Anton.TextTertiary)
                     inner()
                 },
             )
             Row(
-                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Chips keep their full labels and the row scrolls sideways when they don't fit.
                 Row(

@@ -112,7 +112,7 @@ fun RemoteImage(
     when (val s = state) {
         is ImageBitmap -> Image(s, contentDescription, modifier, contentScale = contentScale)
         else -> Box(modifier.background(Anton.Raised), contentAlignment = Alignment.Center) {
-            if (s == false) Icon(Lucide.Image, null, tint = Anton.IconDisabled, modifier = Modifier.size(18.dp))
+            if (s == false) Icon(Lucide.Image, null, tint = Anton.IconDisabled, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -149,7 +149,7 @@ fun ImageViewer(url: String, name: String, onDismiss: () -> Unit) {
                     .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Lucide.Image, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp))
+                Icon(Lucide.Image, null, tint = Anton.IconSecondary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(name, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 GhostIconButton(Lucide.X, "Close", tint = Anton.TextPrimary, size = 40.dp, iconSize = 20.dp, onClick = onDismiss)
@@ -169,18 +169,18 @@ fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Mo
     Row(
         modifier.widthIn(max = 260.dp).clip(shape).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, shape)
             .then(if (imageUrl != null && viewer != null) Modifier.clickable { viewer(imageUrl, name) } else Modifier)
-            .padding(start = 5.dp, end = 11.dp, top = 5.dp, bottom = 5.dp),
+            .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         val tile = RoundedCornerShape(6.dp)
         Box(Modifier.size(28.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
             if (imageUrl != null) RemoteImage(imageUrl, null, Modifier.fillMaxSize(), ContentScale.Crop, maxPx = 96)
-            else Icon(Lucide.FileText, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
+            else Icon(Lucide.FileText, null, tint = Anton.IconTertiary, modifier = Modifier.size(15.dp))
         }
         Column(Modifier.weight(1f, fill = false)) {
             Text(name, style = Type.SmallMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            note?.let { Text(it, style = Type.Meta.copy(fontSize = 10.5.sp), color = Anton.TextTertiary, maxLines = 1) }
+            note?.let { Text(it, style = Type.Meta.copy(fontSize = 11.5.sp), color = Anton.TextTertiary, maxLines = 1) }
         }
     }
 }
@@ -191,7 +191,7 @@ fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Mo
 fun SentAttachments(files: List<Attachments.Ref>, modifier: Modifier = Modifier) {
     if (files.isEmpty()) return
     val place = LocalFilePlace.current
-    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEach { f ->
             FileChip(f.name, "${f.kind} · ${Attachments.size(f.size)}", imageUrl = if (f.image) place.attachment(f) else null)
         }
@@ -213,9 +213,9 @@ fun ImageCard(url: String, name: String, modifier: Modifier = Modifier, height: 
                 Modifier.fillMaxWidth().hairlineTop().padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Icon(Lucide.Image, null, tint = Anton.IconTertiary, modifier = Modifier.size(12.dp))
+                Icon(Lucide.Image, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp))
                 Text(name.substringAfterLast('/'), style = Type.Meta, color = Anton.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Icon(Lucide.Maximize2, null, tint = Anton.IconDisabled, modifier = Modifier.size(11.dp))
+                Icon(Lucide.Maximize2, null, tint = Anton.IconDisabled, modifier = Modifier.size(12.dp))
             }
         }
     }
@@ -234,7 +234,7 @@ fun ReplyOutputs(paths: List<String>) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReplyFiles(files: List<Triple<String, String, Boolean>>) {
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEach { (path, url, image) ->
             val folder = path.substringBeforeLast('/', "").ifBlank { null }
             val ext = path.substringAfterLast('.', "").uppercase().ifBlank { null }

@@ -234,7 +234,7 @@ fun <T> Segmented(
             val shape = RoundedCornerShape(7.dp)
             Row(
                 Modifier
-                    .height(28.dp)
+                    .height(32.dp)
                     .clip(shape)
                     .then(
                         if (on) Modifier
@@ -250,7 +250,7 @@ fun <T> Segmented(
             ) {
                 Text(label, style = Type.SmallMedium, color = if (on) Anton.TextPrimary else Anton.TextTertiary, maxLines = 1)
                 counts[value]?.takeIf { it > 0 }?.let {
-                    Text("$it", style = Type.Num.copy(fontSize = 10.5.sp), color = if (on) Anton.TextSecondary else Anton.TextDisabled)
+                    Text("$it", style = Type.Num.copy(fontSize = 11.5.sp), color = if (on) Anton.TextSecondary else Anton.TextDisabled)
                 }
             }
         }
@@ -260,7 +260,7 @@ fun <T> Segmented(
 /* ── Labels ── */
 
 @Composable
-fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
+fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 6.dp)) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text.uppercase(), style = Type.MonoLabel, color = Anton.TextDisabled)
         count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
@@ -281,10 +281,10 @@ fun Badge(text: String, tone: Tone = Tone.Neutral, mono: Boolean = false) {
     }
     val shape = RoundedCornerShape(6.dp)
     Box(
-        Modifier.height(20.dp).clip(shape).background(bg).border(1.dp, bd, shape).padding(horizontal = 7.dp),
+        Modifier.height(22.dp).clip(shape).background(bg).border(1.dp, bd, shape).padding(horizontal = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = if (mono) Type.Num.copy(fontSize = 10.5.sp) else Type.SmallMedium.copy(fontSize = 11.sp), color = fg, maxLines = 1)
+        Text(text, style = if (mono) Type.Num.copy(fontSize = 11.5.sp) else Type.SmallMedium.copy(fontSize = 12.sp), color = fg, maxLines = 1)
     }
 }
 
@@ -292,7 +292,7 @@ fun Badge(text: String, tone: Tone = Tone.Neutral, mono: Boolean = false) {
 
 enum class ButtonVariant { Primary, Outline, Secondary, Ghost, Destructive }
 enum class ButtonSize(val height: Dp, val padding: Dp, val icon: Dp) {
-    Sm(28.dp, 10.dp, 14.dp), Md(34.dp, 12.dp, 15.dp), Lg(40.dp, 16.dp, 16.dp)
+    Sm(32.dp, 12.dp, 15.dp), Md(38.dp, 14.dp, 16.dp), Lg(44.dp, 16.dp, 18.dp)
 }
 
 @Composable
@@ -339,8 +339,8 @@ fun GhostIconButton(
     icon: ImageVector,
     label: String,
     tint: Color = Anton.IconTertiary,
-    size: Dp = 32.dp,
-    iconSize: Dp = 18.dp,
+    size: Dp = 36.dp,
+    iconSize: Dp = 20.dp,
     onClick: () -> Unit = {},
 ) {
     Box(
@@ -365,7 +365,7 @@ fun AntonInput(
     leadingIcon: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
     singleLine: Boolean = true,
-    minHeight: Dp = 36.dp,
+    minHeight: Dp = 40.dp,
     mono: Boolean = false,
     secret: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -374,7 +374,7 @@ fun AntonInput(
     val focused by interactionSource.collectIsFocusedAsState()
     val borderColor by animateColorAsState(if (focused) Anton.Accent.copy(alpha = 0.7f) else Anton.Input, tween(120), label = "inputBorder")
     val ring by animateDpAsState(if (focused) 3.dp else 0.dp, tween(120), label = "ring")
-    val style: TextStyle = (if (mono) Type.Code else Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp)).copy(color = Anton.TextPrimary)
+    val style: TextStyle = (if (mono) Type.Code else Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp)).copy(color = Anton.TextPrimary)
     val shape = RoundedCornerShape(8.dp)
     BasicTextField(
         value = value,
@@ -407,7 +407,7 @@ fun AntonInput(
                 verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                leadingIcon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(15.dp)) }
+                leadingIcon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(16.dp)) }
                 Box(Modifier.weight(1f)) {
                     if (value.isEmpty() && placeholder.isNotEmpty()) {
                         Text(placeholder, style = style.copy(color = Anton.TextTertiary), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -423,7 +423,7 @@ fun AntonInput(
 /** A form field: mono micro label over a control, like the web's settings forms. */
 @Composable
 fun Field(label: String, modifier: Modifier = Modifier, hint: String? = null, content: @Composable () -> Unit) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = Type.SmallMedium, color = Anton.TextSecondary)
         content()
         hint?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary) }
@@ -453,7 +453,7 @@ fun SelectChip(
     val shape = RoundedCornerShape(7.dp)
     Row(
         modifier
-            .height(28.dp)
+            .height(32.dp)
             .clip(shape)
             .background(if (open) Anton.Pressed else Anton.InputBg)
             .border(1.dp, if (open) Anton.Accent.copy(alpha = 0.55f) else Anton.Input, shape)
@@ -463,17 +463,17 @@ fun SelectChip(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         leading?.invoke()
-        icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp)) }
+        icon?.let { Icon(it, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp)) }
         dot?.let { Box(Modifier.size(6.dp).clip(CircleShape).background(it)) }
         Text(
             label,
-            style = if (mono) Type.Num.copy(fontSize = 11.5.sp) else Type.Small,
+            style = if (mono) Type.Num.copy(fontSize = 12.5.sp) else Type.Small,
             color = Anton.TextPrimary,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         trailing?.invoke()
-        if (chevron) Icon(Lucide.ChevronDown, null, tint = Anton.IconTertiary, modifier = Modifier.size(13.dp))
+        if (chevron) Icon(Lucide.ChevronDown, null, tint = Anton.IconTertiary, modifier = Modifier.size(14.dp))
     }
 }
 
@@ -522,8 +522,8 @@ fun ListRow(
         modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 52.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -531,9 +531,9 @@ fun ListRow(
             Box(
                 Modifier.size(28.dp).clip(RoundedCornerShape(7.dp)).background(Anton.Hover).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(it, null, tint = Anton.IconSecondary, modifier = Modifier.size(14.dp)) }
+            ) { Icon(it, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp)) }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, style = Type.BodyMedium, color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             subtitle?.let {
                 Text(
@@ -543,7 +543,7 @@ fun ListRow(
             }
         }
         trailing?.invoke()
-        if (chevron) Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(15.dp))
+        if (chevron) Icon(Lucide.ChevronRight, null, tint = Anton.IconDisabled, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -554,10 +554,10 @@ fun ErrorNotice(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier.fillMaxWidth().clip(shape).background(Anton.DangerBg).border(1.dp, Anton.DangerBorder, shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(Lucide.CircleAlert, null, tint = Anton.Danger, modifier = Modifier.size(15.dp).padding(top = 1.dp))
+        Icon(Lucide.CircleAlert, null, tint = Anton.Danger, modifier = Modifier.size(16.dp).padding(top = 1.dp))
         Text(text, style = Type.Meta, color = Anton.DangerText, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -573,7 +573,7 @@ fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifie
         Box(
             Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(18.dp)) }
+        ) { Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(20.dp)) }
         Spacer(Modifier.height(4.dp))
         Text(title, style = Type.BodyMedium, color = Anton.TextPrimary)
         Text(body, style = Type.Meta, color = Anton.TextTertiary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -614,21 +614,21 @@ fun AntonComposer(
     ) {
         BasicTextField(
             value = text, onValueChange = { text = it },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
-            textStyle = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp, color = Anton.TextPrimary),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+            textStyle = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp, color = Anton.TextPrimary),
             cursorBrush = SolidColor(Anton.Accent),
             maxLines = 6,
             interactionSource = interaction,
             decorationBox = { inner ->
-                if (text.isEmpty()) Text(placeholder, style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 19.sp), color = Anton.TextTertiary)
+                if (text.isEmpty()) Text(placeholder, style = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp), color = Anton.TextTertiary)
                 inner()
             },
         )
         Row(
-            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
+            Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp)
                 GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp)
                 if (model.isNotBlank()) {
@@ -649,7 +649,7 @@ fun AntonComposer(
                 else -> Anton.Accent
             }
             Box(
-                Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                Modifier.size(34.dp).clip(RoundedCornerShape(8.dp))
                     .background(bg)
                     .border(1.dp, if (working) Anton.DangerBorder else Color.Transparent, RoundedCornerShape(8.dp))
                     .clickable(sendInteraction, indication = null, role = Role.Button) {
@@ -676,7 +676,7 @@ fun TraceRow(text: String, detail: String? = null, live: Boolean = false) {
         1f, 0.35f, infiniteRepeatable(tween(800), androidx.compose.animation.core.RepeatMode.Reverse), label = "a",
     )
     Row(
-        Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 8.dp),
+        Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

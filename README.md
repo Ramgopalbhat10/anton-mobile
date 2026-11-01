@@ -4,9 +4,9 @@ A minimal, linear Android client for [Anton](https://github.com/Ramgopalbhat10/a
 
 ## Design kit
 
-The UI mirrors the web app's shadcn components without pulling in a UI library (release APK ≈ 1.5 MB):
+The UI mirrors the web app's shadcn components without pulling in a UI library (release APK ≈ 1.65 MB). The full reference (colours, type, spacing scale, components, icons, size budget) is in [docs/design/mobile-design-kit.md](docs/design/mobile-design-kit.md).
 
-- `ui/theme/Theme.kt` — Anton tokens plus the shadcn aliases the web maps onto them (`popover`, `input`, `ring`), Geist + Geist Mono (variable TTFs, Latin subset, ~67 KB in the APK; OFL, see `licenses/`), and a press highlight that replaces Material's ripple.
+- `ui/theme/Theme.kt` — Anton tokens, the `Space` spacing scale, plus the shadcn aliases the web maps onto them (`popover`, `input`, `ring`), Geist + Geist Mono (variable TTFs, Latin subset, ~67 KB in the APK; OFL, see `licenses/`), and a press highlight that replaces Material's ripple.
 - `ui/theme/Lucide.kt` — the lucide icons the web uses, as small stroke vectors (no icon library).
 - `ui/components/Components.kt` — card, button variants, input with focus ring, select trigger, switch, badge, list rows, segmented control, composer.
 - `ui/components/Overlays.kt` — anchored dropdown/popover with menu items, searchable select (combobox), and the bottom sheet every picker and form uses.

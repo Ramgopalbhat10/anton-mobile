@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 
 @Composable
@@ -41,7 +42,7 @@ fun SettingsScreen(
         AppBar("Settings")
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.contentWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp).padding(bottom = 24.dp),
+            Modifier.contentWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = Space.Gutter).padding(bottom = 32.dp),
         ) {
             GroupLabel("Server")
             AntonCard(Modifier.fillMaxWidth()) {
@@ -82,7 +83,7 @@ fun SettingsScreen(
             Text(
                 "Anton for Android",
                 style = Type.Num, color = Anton.TextDisabled,
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
             )
         }
         }
@@ -94,7 +95,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun GroupLabel(text: String) = SectionLabel(text, modifier = Modifier.padding(start = 4.dp, top = 18.dp, bottom = 8.dp))
+private fun GroupLabel(text: String) = SectionLabel(text, modifier = Modifier.padding(start = 4.dp, top = 24.dp, bottom = 10.dp))
 
 @Composable
 private fun ToggleRow(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
@@ -113,8 +114,8 @@ private fun ServerSheet(
     var secret by remember { mutableStateOf(cfSecret) }
     AntonSheet(onDismiss = onDismiss, title = "Server", subtitle = "Every request carries the service token, including the live stream.") {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 16.dp).imePadding(),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 20.dp).imePadding(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Field("Server URL") {
                 AntonInput(
@@ -137,7 +138,7 @@ private fun ServerSheet(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AntonButton("Cancel", onClick = onDismiss, variant = ButtonVariant.Outline, size = ButtonSize.Lg, modifier = Modifier.weight(1f))
                 AntonButton("Save", onClick = { onSave(url, id, secret) }, size = ButtonSize.Lg, modifier = Modifier.weight(1f))
             }

@@ -32,6 +32,7 @@ import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
@@ -59,7 +60,7 @@ fun ThreadScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(
-            Modifier.fillMaxWidth().hairlineBottom().heightIn(min = 52.dp).padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().hairlineBottom().heightIn(min = 56.dp).padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GhostIconButton(Lucide.ChevronLeft, "Back", tint = Anton.IconSecondary, iconSize = 20.dp, onClick = onBack)
@@ -68,7 +69,7 @@ fun ThreadScreen(
                 s?.let {
                     StateGlyph(it.glyph())
                     Spacer(Modifier.width(8.dp))
-                    Text(it.title.ifBlank { "Untitled" }, style = Type.BodyMedium.copy(fontSize = 14.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(it.title.ifBlank { "Untitled" }, style = Type.BodyMedium.copy(fontSize = 15.5.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     Spacer(Modifier.width(8.dp))
                     Text(it.glyph().label, style = Type.Meta, color = Anton.TextTertiary, maxLines = 1)
                 }
@@ -101,7 +102,7 @@ fun ThreadScreen(
                 LocalRuns provides bundle?.runs.orEmpty(),
                 LocalFilePlace provides FilePlace(sessionId = s?.id, spaceId = s?.spaceId),
             ) {
-            LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
                 val lastAgent = messages.lastOrNull()?.takeIf { it.role != "user" }
                 items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
                     if (m.role == "user") UserMessage(m) else AgentMessage(m, live = s?.working == true && m === lastAgent)
@@ -145,20 +146,24 @@ internal fun mdColors(text: androidx.compose.ui.graphics.Color = Anton.TextPrima
     linkText = Anton.Accent,
 )
 
+/** Room between paragraphs, lists and list items in a reply. */
+@Composable
+internal fun mdPadding() = com.mikepenz.markdown.model.markdownPadding(block = 6.dp, list = 2.dp, listItemBottom = 4.dp)
+
 /** The transcript's Markdown type; `small` for the words between steps in a work card. */
 @Composable
 internal fun mdType(small: Boolean = false): com.mikepenz.markdown.model.MarkdownTypography {
-    val body = if (small) Type.Small.copy(fontSize = 12.5.sp, lineHeight = 18.sp) else Type.Body.copy(lineHeight = 19.sp)
+    val body = if (small) Type.Small.copy(fontSize = 13.5.sp, lineHeight = 21.sp) else Type.Body.copy(lineHeight = 22.sp)
     return markdownTypography(
         text = body,
         h1 = Type.Heading,
-        h2 = Type.BodyMedium.copy(fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+        h2 = Type.BodyMedium.copy(fontSize = 15.5.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
         h3 = Type.BodyMedium,
         h4 = Type.BodyMedium,
         h5 = Type.BodyMedium,
         h6 = Type.BodyMedium,
         code = Type.Code,
-        inlineCode = Type.Code.copy(fontSize = 12.sp),
+        inlineCode = Type.Code.copy(fontSize = 13.sp),
         list = body,
         bullet = body,
         quote = body.copy(color = Anton.TextSecondary),
@@ -174,7 +179,7 @@ fun UserMessage(m: MessageDto) {
     // Attached files show as chips; the text they carry is the agent's to read.
     val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
     val images = m.parts.filter { it.type == "file" && it.mediaType?.startsWith("image/") == true && !it.url.isNullOrBlank() }
-    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 images.forEach { img -> ImageCard(img.url!!, img.title ?: img.path ?: "Attached image", height = 120.dp, caption = false) }
@@ -187,9 +192,9 @@ fun UserMessage(m: MessageDto) {
                     .clip(shape)
                     .background(Anton.Overlay)
                     .border(1.dp, Anton.CardBorder, shape)
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                    .padding(horizontal = 15.dp, vertical = 11.dp),
             ) {
-                Text(split.text, style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextPrimary)
+                Text(split.text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextPrimary)
             }
         }
     }
@@ -203,10 +208,10 @@ fun UserMessage(m: MessageDto) {
 fun AgentMessage(m: MessageDto, live: Boolean = false) {
     val (work, rest) = remember(m.parts) { splitWork(m.parts) }
     val outputs = remember(m.parts) { Outputs.ofReply(m.parts) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (work.isNotEmpty()) {
             WorkCard(work, live = live, durationMs = m.durationMs) { text ->
-                Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true))
+                Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
             }
         }
         rest.forEach { PartView(it) }
@@ -217,7 +222,7 @@ fun AgentMessage(m: MessageDto, live: Boolean = false) {
 @Composable
 private fun PartView(p: PartDto) {
     when (p.type) {
-        "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType())
+        "text" -> Markdown(p.text.orEmpty(), colors = mdColors(), typography = mdType(), padding = mdPadding())
         "ask" -> AskCard(p)
         "thread" -> ThreadCard(p)
         "file" -> (p.title ?: p.path)?.let { name ->
@@ -234,7 +239,7 @@ fun ThreadCard(p: PartDto) {
     val working = p.state == "working"
     AntonCard(Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, top = 11.dp, bottom = if (p.text != null || p.question != null) 2.dp else 11.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, top = 13.dp, bottom = if (p.text != null || p.question != null) 4.dp else 13.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(Modifier.size(7.dp).clip(CircleShape).background(if (working) Anton.Accent else Anton.Success))
@@ -242,11 +247,11 @@ fun ThreadCard(p: PartDto) {
             p.state?.let { Badge(it, if (working) Tone.Accent else Tone.Neutral, mono = true) }
         }
         if (p.text != null || p.question != null) {
-            Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                p.text?.let { Markdown(it, colors = mdColors(), typography = mdType()) }
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                p.text?.let { Markdown(it, colors = mdColors(), typography = mdType(), padding = mdPadding()) }
                 p.question?.let {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Lucide.CircleHelp, null, tint = Anton.Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
+                        Icon(Lucide.CircleHelp, null, tint = Anton.Warning, modifier = Modifier.size(14.dp).padding(top = 2.dp))
                         Text(it, style = Type.Small, color = Anton.WarningText)
                     }
                 }
@@ -272,12 +277,12 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
         else -> Tone.Accent to "Open"
     }
     AntonCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(13.dp)) }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(14.dp)) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         (if (number.isNotBlank()) "PR #$number · " else "") + (s?.title?.ifBlank { "Pull request" } ?: "Pull request"),
@@ -293,11 +298,11 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
         }
         val runs = prState?.runs.orEmpty()
         if (runs.isNotEmpty() || prState?.approved == true) {
-            Row(Modifier.padding(start = 48.dp, end = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.padding(start = 52.dp, end = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val ok = runs.count { it.status == "passed" }
                 val bad = runs.count { it.status == "failed" }
                 if (runs.isNotEmpty()) {
-                    Icon(if (bad > 0) Lucide.X else Lucide.Check, null, tint = if (bad > 0) Anton.Danger else Anton.Success, modifier = Modifier.size(12.dp))
+                    Icon(if (bad > 0) Lucide.X else Lucide.Check, null, tint = if (bad > 0) Anton.Danger else Anton.Success, modifier = Modifier.size(13.dp))
                     Text("$ok/${runs.size} checks" + if (bad > 0) " · $bad failed" else "", style = Type.Meta, color = if (bad > 0) Anton.DangerText else Anton.TextTertiary)
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         runs.take(8).forEach { run ->
@@ -310,7 +315,7 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
                 if (prState?.approved == true) Text("Approved", style = Type.Meta, color = Anton.SuccessText)
             }
         }
-        Row(Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+        Row(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) {
             AntonButton("Open on GitHub", onClick = open, variant = ButtonVariant.Outline, icon = Lucide.Github, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -325,13 +330,13 @@ private fun AskCard(p: PartDto) {
     var picked by remember(p) { mutableStateOf(if (answered) p.options.indexOfFirst { it.label == answeredLabel } else recommended ?: -1) }
     val answer = LocalAnswer.current
     AntonCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(start = 14.dp, top = 12.dp, bottom = 10.dp, end = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 12.dp, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(13.dp)) }
+            ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f)) {
-                Text(p.question.orEmpty(), style = Type.BodyMedium.copy(lineHeight = 20.sp), color = Anton.TextPrimary)
+                Text(p.question.orEmpty(), style = Type.BodyMedium.copy(lineHeight = 22.sp), color = Anton.TextPrimary)
                 Text(
                     if (answered) "Answered" else if (p.options.isEmpty()) "Answer below to reply" else "Pick an answer, or reply below",
                     style = Type.Meta, color = Anton.TextTertiary,
@@ -339,16 +344,16 @@ private fun AskCard(p: PartDto) {
             }
         }
         if (p.options.isNotEmpty()) {
-            Column(Modifier.padding(horizontal = 8.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(horizontal = 10.dp).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 p.options.forEachIndexed { i, opt ->
                     val on = i == picked
                     val shape = RoundedCornerShape(9.dp)
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(shape)
+                        Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(shape)
                             .background(if (on) Anton.AccentBg else Color.Transparent)
                             .border(1.dp, if (on) Anton.AccentBorder else Anton.BorderSubtle, shape)
                             .clickable(enabled = !answered) { picked = i }
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -358,10 +363,10 @@ private fun AskCard(p: PartDto) {
                                 .border(1.dp, if (on) Color.Transparent else Anton.BorderDefault, RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (on) Icon(Lucide.Check, null, tint = Anton.AccentFg, modifier = Modifier.size(12.dp))
-                            else Text("${i + 1}", style = Type.Num.copy(fontSize = 10.5.sp), color = Anton.TextTertiary)
+                            if (on) Icon(Lucide.Check, null, tint = Anton.AccentFg, modifier = Modifier.size(13.dp))
+                            else Text("${i + 1}", style = Type.Num.copy(fontSize = 11.5.sp), color = Anton.TextTertiary)
                         }
-                        Text(opt.label, style = Type.Body.copy(fontSize = 12.5.sp, lineHeight = 18.sp), color = Anton.TextPrimary, modifier = Modifier.weight(1f))
+                        Text(opt.label, style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 20.sp), color = Anton.TextPrimary, modifier = Modifier.weight(1f))
                         val hint = opt.hint ?: if (i == recommended) "recommended" else null
                         hint?.let { Text(it, style = Type.Meta, color = Anton.TextDisabled, maxLines = 1) }
                     }
@@ -381,11 +386,11 @@ private fun AskCard(p: PartDto) {
 
 @Composable
 private fun QueuedNote(text: String) {
-    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
         Box(
-            Modifier.clip(shape).border(1.dp, Anton.BorderDefault, shape).padding(horizontal = 14.dp, vertical = 9.dp),
-        ) { Text(text, style = Type.Body.copy(lineHeight = 19.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+            Modifier.clip(shape).border(1.dp, Anton.BorderDefault, shape).padding(horizontal = 15.dp, vertical = 11.dp),
+        ) { Text(text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(4.dp).clip(CircleShape).background(Anton.N500))
             Text("Queued — joins when this turn finishes", style = Type.Meta, color = Anton.TextDisabled)
@@ -401,7 +406,7 @@ private fun Composer(
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-    Column(Modifier.contentWidth().padding(horizontal = 12.dp).padding(top = 6.dp, bottom = 10.dp)) {
+    Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 12.dp)) {
         AntonComposer(
             placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
             working = working, sending = sending,

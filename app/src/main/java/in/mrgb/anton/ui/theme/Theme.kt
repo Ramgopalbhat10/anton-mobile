@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.R
 import kotlinx.coroutines.launch
 
@@ -157,28 +158,48 @@ private val scheme = darkColorScheme(
 )
 
 /**
- * Anton's type scale (signal-tokens.css): body 13/18, small 12/16, micro 11,
- * titles 16 semibold; mono labels 10.5 uppercase tracking .08em. All Geist.
+ * Anton's type scale (signal-tokens.css): body 14.5/21, small 13.5/19, meta 12.5/19,
+ * titles 18 semibold; mono labels 11.5 uppercase tracking .08em. All Geist.
  */
+/**
+ * Spacing scale (dp). Everything sits on a 2/4dp grid; the named roles are
+ * what screens reach for so the rhythm stays the same app-wide.
+ * See docs/design/mobile-design-kit.md.
+ */
+object Space {
+    val Xxs = 2.dp
+    val Xs = 4.dp
+    val Sm = 8.dp
+    val Md = 12.dp
+    val Lg = 16.dp
+    val Xl = 20.dp
+    val Xxl = 24.dp
+
+    /** Screen edge to content. */
+    val Gutter = 18.dp
+    /** Between turns in a transcript. */
+    val Turn = 20.dp
+}
+
 object Type {
     private val base = TextStyle(fontFamily = GeistSans)
     private val mono = TextStyle(fontFamily = GeistMono)
-    val Title = base.copy(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp)
-    val Heading = base.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp)
-    val Body = base.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal)
-    val BodyMedium = base.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
-    val BodyLarge = base.copy(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
-    val Meta = base.copy(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
-    val Small = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
-    val SmallMedium = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+    val Title = base.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp)
+    val Heading = base.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp)
+    val Body = base.copy(fontSize = 14.5.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
+    val BodyMedium = base.copy(fontSize = 14.5.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
+    val BodyLarge = base.copy(fontSize = 15.5.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
+    val Meta = base.copy(fontSize = 12.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
+    val Small = base.copy(fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
+    val SmallMedium = base.copy(fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
     val MonoLabel = mono.copy(
-        fontSize = 10.5.sp,
-        lineHeight = 16.sp,
+        fontSize = 11.5.sp,
+        lineHeight = 18.sp,
         fontWeight = FontWeight.Medium,
         letterSpacing = 0.84.sp,
     )
-    val Num = mono.copy(fontSize = 11.sp, lineHeight = 16.sp)
-    val Code = mono.copy(fontSize = 12.sp, lineHeight = 18.sp)
+    val Num = mono.copy(fontSize = 12.sp, lineHeight = 18.sp)
+    val Code = mono.copy(fontSize = 13.sp, lineHeight = 20.sp)
 }
 
 private val typography = Typography().let { t ->
