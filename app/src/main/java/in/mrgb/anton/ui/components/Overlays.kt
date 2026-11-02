@@ -215,12 +215,13 @@ fun <T> AntonSelect(
     menuWidth: Dp = 280.dp,
     alignEnd: Boolean = false,
     header: (@Composable ColumnScope.(dismiss: () -> Unit) -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     var open by remember { mutableStateOf(false) }
     var q by remember { mutableStateOf("") }
     Box(modifier) {
-        SelectChip(label, onClick = { open = true; q = "" }, icon = icon, open = open, mono = mono)
-        AntonDropdown(expanded = open, onDismiss = { open = false }, width = menuWidth, alignEnd = alignEnd, scrollable = false) {
+        SelectChip(label, onClick = { open = true; q = "" }, icon = icon, open = open, mono = mono, enabled = enabled)
+        AntonDropdown(expanded = open && enabled, onDismiss = { open = false }, width = menuWidth, alignEnd = alignEnd, scrollable = false) {
             if (options.size > 8) {
                 AntonInput(
                     q, { q = it },

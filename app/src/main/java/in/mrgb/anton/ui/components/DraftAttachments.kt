@@ -36,7 +36,9 @@ import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -75,17 +77,17 @@ private fun decode(bytes: ByteArray, maxPx: Int): ImageBitmap? {
  * useAttachments: images the model sees go with the message, every other file
  * uploads as the message sends and is named in its body.
  */
-class DraftAttachments(
-    private val resolver: ContentResolver,
-    private val scope: CoroutineScope,
-) {
+class DraftAttachments {
     val images = mutableStateListOf<DraftImage>()
     val files = mutableStateListOf<PendingUpload>()
     var notice by mutableStateOf<String?>(null); private set
     val count get() = images.size + files.size
     val full get() = images.size >= MAX_IMAGES && files.size >= MAX_FILES
+    var locked by mutableStateOf(false); internal set
+    private var reads by mutableIntStateOf(0)
+    val reading get() = reads > 0
 
-    private fun read(uri: Uri): PendingUpload? = runCatching {
+    private fun read(resolver: ContentResolver, uri: Uri): PendingUpload? = runCatching {
         val named = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
             ?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
@@ -98,60 +100,71 @@ class DraftAttachments(
     }.getOrNull()
 
     /** The picked files, sorted like the web's readAttachments: seeable images as images, the rest as files. */
-    fun attach(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        scope.launch {
-            val picked = withContext(Dispatchers.IO) { uris.mapNotNull(::read) }
-            val fits = picked.filter { it.bytes.size <= MAX_FILE_BYTES }
-            val pictures = fits.filter(::sentAsImage)
-            val others = fits.filter { !sentAsImage(it) }
-            val keptPictures = pictures.take((MAX_IMAGES - images.size).coerceAtLeast(0))
-            val keptOthers = others.take((MAX_FILES - files.size).coerceAtLeast(0))
-            val taken = files.mapTo(mutableSetOf()) { it.name }
-            val named = keptOthers.map { f ->
-                val n = freeName(f.name, taken)
-                taken += n
-                if (n == f.name) f else f.copy(name = n)
-            }
-            val previews = withContext(Dispatchers.IO) { keptPictures.map { DraftImage(it, decode(it.bytes, 168)) } }
-            images += previews
-            files += named
-            notice = when {
-                fits.size < picked.size -> "Files up to 20 MB can be attached."
-                keptPictures.size < pictures.size -> "Up to $MAX_IMAGES images per message."
-                keptOthers.size < others.size -> "Up to $MAX_FILES files per message."
-                else -> null
-            }
+    fun attach(uris: List<Uri>, resolver: ContentResolver, scope: CoroutineScope): Job? =
+        if (uris.isEmpty()) null else attach(scope) {
+            withContext(Dispatchers.IO) { uris.mapNotNull { read(resolver, it) } }
+        }
+
+    internal fun attach(scope: CoroutineScope, load: suspend () -> List<PendingUpload>): Job? {
+        if (locked) return null
+        // Set before launch so Send cannot race a picker read that has not started yet.
+        reads++
+        return scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                val picked = load()
+                val fits = picked.filter { it.bytes.size <= MAX_FILE_BYTES }
+                val pictures = fits.filter(::sentAsImage)
+                val others = fits.filter { !sentAsImage(it) }
+                val previews = withContext(Dispatchers.IO) {
+                    pictures.take(MAX_IMAGES).map { DraftImage(it, decode(it.bytes, 168)) }
+                }
+                // No suspension between capacity/name checks and insertion: concurrent
+                // picker reads must see each other's results, not exceed the limits.
+                val keptPictures = previews.take((MAX_IMAGES - images.size).coerceAtLeast(0))
+                val keptOthers = others.take((MAX_FILES - files.size).coerceAtLeast(0))
+                val taken = (images.map { it.upload.name } + files.map { it.name }).toMutableSet()
+                fun named(f: PendingUpload): PendingUpload {
+                    val n = freeName(f.name, taken)
+                    taken += n
+                    return if (n == f.name) f else f.copy(name = n)
+                }
+                images += keptPictures.map { DraftImage(named(it.upload), it.preview) }
+                files += keptOthers.map(::named)
+                notice = when {
+                    fits.size < picked.size -> "Files up to 20 MB can be attached."
+                    keptPictures.size < pictures.size -> "Up to $MAX_IMAGES images per message."
+                    keptOthers.size < others.size -> "Up to $MAX_FILES files per message."
+                    else -> null
+                }
+            } finally { reads-- }
         }
     }
 
-    /** Empties the draft's attachments and hands them over, for sending. */
-    fun take(): OutgoingDraft {
-        val out = OutgoingDraft(images.map { it.upload }, files.toList())
+    /** Sending snapshots bytes without consuming them; only confirmed admission clears them. */
+    fun snapshot() = OutgoingDraft(images.map { it.upload }, files.toList())
+
+    internal fun clear() {
         images.clear()
         files.clear()
         notice = null
-        return out
     }
 
-    /** Puts back attachments a send could not deliver, unless new ones were added since. */
-    fun restore(taken: OutgoingDraft) {
-        if (images.isEmpty()) scope.launch {
-            val previews = withContext(Dispatchers.IO) { taken.images.map { DraftImage(it, decode(it.bytes, 168)) } }
-            if (images.isEmpty()) images += previews
-        }
-        if (files.isEmpty()) files += taken.files
-    }
-
-    fun removeImage(image: DraftImage) { images -= image }
-    fun removeFile(file: PendingUpload) { files -= file }
+    fun removeImage(image: DraftImage) { if (!locked) images -= image }
+    fun removeFile(file: PendingUpload) { if (!locked) files -= file }
 }
 
 @Composable
 fun rememberDraftAttachments(): DraftAttachments {
+    return remember { DraftAttachments() }
+}
+
+/** VM-owned reads outlive the editor; only application context is retained by an active read. */
+@Composable
+fun rememberDraftPicker(draft: MessageDraft): ComposerPicker {
     val resolver = LocalContext.current.applicationContext.contentResolver
-    val scope = rememberCoroutineScope()
-    return remember { DraftAttachments(resolver, scope) }
+    val editorScope = rememberCoroutineScope()
+    val scope = draft.readScope ?: editorScope
+    return rememberComposerPicker { uris -> draft.attachments.attach(uris, resolver, scope) }
 }
 
 /** The two system pickers a composer offers: any files, or photos/screenshots only. */
@@ -173,7 +186,7 @@ fun rememberComposerPicker(onPick: (List<Uri>) -> Unit): ComposerPicker {
 
 /** A draft file as a chip: its glyph, name and size, with a remove button. */
 @Composable
-private fun DraftFileChip(file: PendingUpload, onRemove: () -> Unit) {
+private fun DraftFileChip(file: PendingUpload, enabled: Boolean, onRemove: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
         Modifier.height(36.dp).widthIn(max = 240.dp).clip(shape).background(Anton.WellBg).border(1.dp, Anton.BorderSubtle, shape)
@@ -189,7 +202,7 @@ private fun DraftFileChip(file: PendingUpload, onRemove: () -> Unit) {
             Text(file.name, style = Type.SmallMedium.copy(fontSize = 11.5.sp), color = Anton.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(Attachments.size(file.bytes.size.toLong()), style = Type.Meta.copy(fontSize = 10.5.sp), color = Anton.TextTertiary, maxLines = 1)
         }
-        Box(Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onRemove), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)).clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onRemove), contentAlignment = Alignment.Center) {
             Icon(Lucide.X, "Remove ${file.name}", tint = Anton.IconTertiary, modifier = Modifier.size(10.dp))
         }
     }
@@ -209,11 +222,11 @@ fun AttachmentTray(atts: DraftAttachments, modifier: Modifier = Modifier) {
                 }
                 Box(
                     Modifier.align(Alignment.TopEnd).padding(2.dp).size(16.dp).clip(RoundedCornerShape(4.dp))
-                        .background(Color(0x99000000)).clickable(role = androidx.compose.ui.semantics.Role.Button) { atts.removeImage(image) },
+                        .background(Color(0x99000000)).clickable(enabled = !atts.locked, role = androidx.compose.ui.semantics.Role.Button) { atts.removeImage(image) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Lucide.X, "Remove ${image.upload.name}", tint = Anton.TextPrimary, modifier = Modifier.size(10.dp)) }
             }
         }
-        atts.files.forEach { file -> DraftFileChip(file) { atts.removeFile(file) } }
+        atts.files.forEach { file -> DraftFileChip(file, enabled = !atts.locked) { atts.removeFile(file) } }
     }
 }

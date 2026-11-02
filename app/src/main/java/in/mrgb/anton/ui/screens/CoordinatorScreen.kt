@@ -37,6 +37,8 @@ fun CoordinatorScreen(
     onLoadModels: () -> Unit,
     onSend: (String, OutgoingDraft) -> Unit,
     onBack: () -> Unit,
+    draft: MessageDraft = remember { MessageDraft() },
+    onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) {
@@ -45,7 +47,7 @@ fun CoordinatorScreen(
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalAnswer provides { text -> onSend(text, OutgoingDraft()) }, LocalFilePlace provides FilePlace(spaceId = spaceId)) {
+            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId)) {
             LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
                 if (messages.isEmpty()) {
                     item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
@@ -80,7 +82,7 @@ fun CoordinatorScreen(
                     model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
                     modelIcon = if (model.isBlank()) null else ({ ModelMark(Catalog.find(models, model), model, 13.dp) }),
                     modelFacts = if (model.isBlank()) null else ({ ModelFacts(models, model, reasoning) }),
-                    onSend = onSend, onStop = {},
+                    onSend = onSend, onStop = {}, draft = draft,
                     seesImages = Catalog.find(models, model)?.vision != false,
                     onOpenModel = onLoadModels,
                     modelPicker = { dismiss ->

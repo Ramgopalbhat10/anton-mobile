@@ -9,12 +9,22 @@ import app.cash.paparazzi.Paparazzi
 import `in`.mrgb.anton.data.TaskAttachmentServer
 import `in`.mrgb.anton.data.api.*
 import `in`.mrgb.anton.ui.components.ImageStore
+import `in`.mrgb.anton.ui.components.MessageDraft
+import `in`.mrgb.anton.ui.components.DraftImage
+import `in`.mrgb.anton.ui.components.Artifact
+import `in`.mrgb.anton.ui.components.ArtifactPanel
+import `in`.mrgb.anton.ui.components.FilePlace
+import `in`.mrgb.anton.ui.screens.NewTaskSheet
+import `in`.mrgb.anton.vm.TaskCreation
+import org.junit.Assert.*
 import `in`.mrgb.anton.ui.components.LocalImages
 import `in`.mrgb.anton.ui.components.LocalViewer
 import `in`.mrgb.anton.ui.screens.ThreadScreen
 import `in`.mrgb.anton.ui.theme.Anton
 import kotlinx.coroutines.runBlocking
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -31,6 +41,11 @@ internal class TaskAttachmentScenes(private val paparazzi: Paparazzi) {
         paint.color = Color.rgb(63, 182, 216)
         for ((x, y) in listOf(60 to 210, 155 to 170, 240 to 145, 330 to 80, 420 to 42)) canvas.drawCircle(x.toFloat(), y.toFloat(), 7f, paint)
         return PendingUpload("benchmark-cost.png", "image/png", ByteArrayOutputStream().also { image.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray())
+    }
+
+    private fun draftImage(): DraftImage {
+        val upload = chart()
+        return DraftImage(upload, BitmapFactory.decodeByteArray(upload.bytes, 0, upload.bytes.size).asImageBitmap())
     }
 
     private fun snapshot(prompt: String, outgoing: OutgoingDraft) = runBlocking {
@@ -74,4 +89,68 @@ internal class TaskAttachmentScenes(private val paparazzi: Paparazzi) {
             PendingUpload("results.csv", "text/csv", "score,cost\n82,0.50".toByteArray()),
         )),
     )
+
+    fun retryThreadDraft() = runBlocking {
+        TaskAttachmentServer().use { server ->
+            val draft = MessageDraft().apply {
+                edit("What is this image about?")
+                attachments.images += draftImage()
+                attachments.files += PendingUpload("notes.txt", "text/plain", "Notes".toByteArray())
+            }
+            server.uploadStatus = 413
+            assertFalse(draft.deliver { text, files -> server.repo.send("chat-task", text, files) })
+            paparazzi.snapshot {
+                Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
+                    ThreadScreen(
+                        bundle = SessionBundleDto(session = SessionDto("chat-task", title = "What is this image about?")),
+                        messages = emptyList(), diffs = emptyList(), models = emptyList(), reasoning = null,
+                        sending = false, draft = draft, webUrl = "https://example.org", onBack = {}, onSend = { _, _ -> },
+                        onAbort = {}, onStop = {}, onModel = { _, _ -> }, onLoadModels = {},
+                    )
+                }
+            }
+        }
+    }
+
+    fun retryNewTaskDraft() = runBlocking {
+        TaskAttachmentServer().use { server ->
+            val state = TaskCreation().apply {
+                initialize(null, null)
+                draft.edit("What is this image about?")
+                draft.attachments.images += draftImage()
+            }
+            server.uploadStatus = 413
+            state.start(false, server.api::createSession, server.repo::send)
+            assertNotNull(state.sessionId)
+            assertNull(state.completedId)
+            paparazzi.snapshot {
+                Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
+                    NewTaskSheet(repos = emptyList(), branches = emptyList(), defaultBranch = null, models = emptyList(),
+                        planFirst = false, creating = false, onRepo = {}, onPlanFirst = {}, onStart = {}, onDismiss = {}, state = state)
+                }
+            }
+        }
+    }
+
+    fun extensionlessImageViewer() = runBlocking {
+        TaskAttachmentServer().use { server ->
+            val image = chart().copy(name = "image")
+            server.repo.send("chat-task", "Describe this", OutgoingDraft(images = listOf(image)))
+            val message = server.repo.messages("chat-task").single()
+            val ref = Attachments.split(message.parts.first().text!!).files.single()
+            assertTrue(Attachments.inlineImages(message.parts, listOf(ref)).isEmpty())
+            val artifact = FilePlace(sessionId = "chat-task").attachmentArtifact(ref)!!
+            assertEquals(Artifact.Kind.Image, artifact.kind)
+            val images = ImageStore(server.api)
+            images.load(artifact.url, 2048)
+            val bytes = server.api.bytes(artifact.url)
+            paparazzi.snapshot {
+                CompositionLocalProvider(LocalImages provides images) {
+                    Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
+                        ArtifactPanel(listOf(artifact), 0, {}, Modifier.fillMaxSize(), load = { bytes })
+                    }
+                }
+            }
+        }
+    }
 }

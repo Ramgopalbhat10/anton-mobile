@@ -6,6 +6,7 @@ import `in`.mrgb.anton.data.AntonRepository
 import `in`.mrgb.anton.data.SettingsStore
 import `in`.mrgb.anton.data.api.*
 import `in`.mrgb.anton.ui.screens.TasksTab
+import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -49,7 +50,7 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val diffs = _diffs.asStateFlow()
     private val _models = MutableStateFlow<List<ModelDto>>(emptyList())
     val models = _models.asStateFlow()
-    val sending = MutableStateFlow(false)
+    val draft = MessageDraft(viewModelScope)
     val error = MutableStateFlow<String?>(null)
     /** The task's reasoning level, which the facade's session row leaves out. */
     val reasoning = MutableStateFlow<String?>(null)
@@ -82,12 +83,11 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         runCatching { repo.models() }.onSuccess { r -> _models.value = r.models }
     }
 
-    fun send(text: String, outgoing: OutgoingDraft = OutgoingDraft()) = viewModelScope.launch {
-        sending.value = true
-        runCatching { repo.send(sessionId, text, outgoing) }
-            .onFailure { error.value = it.message }
-        sending.value = false
-        refresh()
+    fun send(text: String, outgoing: OutgoingDraft = OutgoingDraft()) = submit(text, outgoing, consumeDraft = true)
+    fun answer(text: String) = submit(text, OutgoingDraft(), consumeDraft = false)
+
+    private fun submit(text: String, outgoing: OutgoingDraft, consumeDraft: Boolean) = viewModelScope.launch {
+        if (draft.deliver(text, outgoing, consumeDraft) { body, files -> repo.send(sessionId, body, files) }) refresh()
     }
 
     fun abort() = viewModelScope.launch {
@@ -129,7 +129,8 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     val coordinatorModel = MutableStateFlow<String?>(null)
     val coordinatorReasoning = MutableStateFlow<String?>(null)
     val models = MutableStateFlow<List<ModelDto>>(emptyList())
-    val sending = MutableStateFlow(false)
+    private val coordinatorDrafts = mutableMapOf<String, MessageDraft>()
+    fun coordinatorDraft(spaceId: String) = coordinatorDrafts.getOrPut(spaceId) { MessageDraft(viewModelScope) }
 
     fun loadModels() = viewModelScope.launch {
         if (models.value.isNotEmpty()) return@launch
@@ -153,11 +154,11 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
         runCatching { repo.api.spaceMessages(id) }.onSuccess { coordinatorMessages.value = it }
     }
 
-    fun sendCoordinator(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) = viewModelScope.launch {
-        sending.value = true
-        runCatching { repo.sendCoordinator(id, text, outgoing) }.onFailure { error.value = it.message }
-        sending.value = false
-        refreshCoordinator(id)
+    fun sendCoordinator(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) = submitCoordinator(id, text, outgoing, consumeDraft = true)
+    fun answerCoordinator(id: String, text: String) = submitCoordinator(id, text, OutgoingDraft(), consumeDraft = false)
+
+    private fun submitCoordinator(id: String, text: String, outgoing: OutgoingDraft, consumeDraft: Boolean) = viewModelScope.launch {
+        if (coordinatorDraft(id).deliver(text, outgoing, consumeDraft) { body, files -> repo.sendCoordinator(id, body, files) }) refreshCoordinator(id)
     }
 }
 
@@ -182,9 +183,8 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     val defaultBranch = MutableStateFlow<String?>(null)
     private var repoDefaults = mapOf<String, String>()
     val models = MutableStateFlow<List<ModelDto>>(emptyList())
-    val creating = MutableStateFlow(false)
+    val creation = TaskCreation(viewModelScope)
     val planFirst = store.planFirst.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val error = MutableStateFlow<String?>(null)
 
     init {
         viewModelScope.launch {
@@ -207,25 +207,7 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
 
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
-    fun start(
-        projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?,
-        outgoing: OutgoingDraft = OutgoingDraft(), onDone: (String?) -> Unit,
-    ) = viewModelScope.launch {
-        creating.value = true
-        error.value = null
-        val named = prompt.ifBlank { outgoing.files.firstOrNull()?.name ?: if (outgoing.images.isNotEmpty()) "Look at the attached image" else "" }
-        val created = runCatching {
-            repo.api.createSession(
-                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = named.take(200), model = model, planMode = planFirst.value, reasoning = reasoning)
-            )
-        }
-        val id = created.getOrNull()?.id
-        if (id == null) {
-            error.value = created.exceptionOrNull()?.message
-        } else {
-            runCatching { repo.send(id, prompt, outgoing) }.onFailure { error.value = it.message }
-        }
-        creating.value = false
-        onDone(id)
+    fun start() = viewModelScope.launch {
+        creation.start(planFirst.value, repo.api::createSession, repo::send)
     }
 }

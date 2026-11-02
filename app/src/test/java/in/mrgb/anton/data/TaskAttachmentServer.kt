@@ -22,6 +22,7 @@ internal class TaskAttachmentServer : AutoCloseable {
     val requests = CopyOnWriteArrayList<RecordedRequest>()
     val uploads = CopyOnWriteArrayList<Upload>()
     val admissions = CopyOnWriteArrayList<JsonObject>()
+    var createStatus = 200
     var uploadStatus = 200
     var malformedUpload = false
     var admissionStatus = 200
@@ -35,7 +36,9 @@ internal class TaskAttachmentServer : AutoCloseable {
                 requests += request
                 val url = request.requestUrl!!
                 return when {
-                    url.encodedPath == "/api/sessions" -> response("""{"session":{"id":"chat-task","title":"What is this image about?"}}""")
+                    url.encodedPath == "/api/sessions" ->
+                        if (createStatus != 200) MockResponse().setResponseCode(createStatus).setBody("Create failed")
+                        else response("""{"session":{"id":"chat-task","title":"What is this image about?"}}""")
                     url.encodedPath.endsWith("/attachments") -> {
                         if (uploadStatus != 200) return MockResponse().setResponseCode(uploadStatus).setBody("Upload failed")
                         if (malformedUpload) return response("{}")
@@ -49,7 +52,7 @@ internal class TaskAttachmentServer : AutoCloseable {
                             put("kind", if (upload.mime.startsWith("image/")) "PNG image" else "File")
                         }.toString())
                     }
-                    url.encodedPath == "/api/agents/coder/chat-task" && request.method == "POST" -> {
+                    url.encodedPath.startsWith("/api/agents/") && request.method == "POST" -> {
                         admissions += api.json.parseToJsonElement(request.body.readUtf8()).jsonObject
                         MockResponse().setResponseCode(admissionStatus).setBody("{}")
                     }

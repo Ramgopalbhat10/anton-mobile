@@ -109,16 +109,20 @@ data class FilePlace(val sessionId: String? = null, val spaceId: String? = null)
     fun output(path: String): String? = sessionId?.let { "/api/sessions/$it/output?path=${enc(path)}" }
     fun attachment(ref: Attachments.Ref): String? =
         if (ref.project) spaceId?.let { "/api/spaces/$it/file?path=${enc(ref.path)}" } else output(ref.path)
+
+    fun attachmentArtifact(ref: Attachments.Ref): Artifact? = attachment(ref)?.let {
+        Artifact(ref.name, it, kindHint = if (ref.image) Artifact.Kind.Image else null)
+    }
 }
 
 val LocalFilePlace = compositionLocalOf { FilePlace() }
 
 /** A file a reply made or a message carried — one item of the artifact slider. */
-data class Artifact(val name: String, val url: String) {
+data class Artifact(val name: String, val url: String, val kindHint: Kind? = null) {
     enum class Kind { Image, Html, Markdown, Text, Other }
 
     val kind: Kind
-        get() = when (name.substringAfterLast('.', "").lowercase()) {
+        get() = kindHint ?: when (name.substringAfterLast('.', "").lowercase()) {
             "png", "jpg", "jpeg", "gif", "webp", "bmp" -> Kind.Image
             "html", "htm", "svg" -> Kind.Html
             "md", "markdown" -> Kind.Markdown
@@ -191,14 +195,17 @@ fun ArtifactViewer(items: List<Artifact>, start: Int, onDismiss: () -> Unit) {
 
 /** The slider's panel — apart from the dialog so snapshots can render it. */
 @Composable
-fun ArtifactPanel(items: List<Artifact>, start: Int, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun ArtifactPanel(
+    items: List<Artifact>, start: Int, onDismiss: () -> Unit, modifier: Modifier = Modifier,
+    load: (suspend (String) -> ByteArray?)? = null,
+) {
     var index by remember { mutableIntStateOf(start.coerceIn(0, items.lastIndex)) }
     val a = items[index]
     val store = LocalImages.current
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val download = LocalDownload.current
-    val body by rememberArtifactBody(a.url, store) { store?.fetch(it) }
+    val body by rememberArtifactBody(a.url, load ?: store) { if (load != null) load(it) else store?.fetch(it) }
     Column(modifier.background(Anton.Canvas)) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 8.dp),
@@ -344,7 +351,7 @@ private fun toast(context: Context, text: String) = Toast.makeText(context, text
 @Composable
 fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Modifier = Modifier, onOpen: (() -> Unit)? = null) {
     val viewer = LocalViewer.current
-    val open = onOpen ?: if (imageUrl != null && viewer != null) { { viewer(listOf(Artifact(name, imageUrl)), 0) } } else null
+    val open = onOpen ?: if (imageUrl != null && viewer != null) { { viewer(listOf(Artifact(name, imageUrl, Artifact.Kind.Image)), 0) } } else null
     val shape = RoundedCornerShape(9.dp)
     Row(
         modifier.widthIn(max = 260.dp).clip(shape).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, shape)
@@ -372,7 +379,7 @@ fun SentAttachments(files: List<Attachments.Ref>, modifier: Modifier = Modifier)
     if (files.isEmpty()) return
     val place = LocalFilePlace.current
     val viewer = LocalViewer.current
-    val artifacts = files.map { f -> place.attachment(f)?.let { Artifact(f.name, it) } }
+    val artifacts = files.map(place::attachmentArtifact)
     val openable = artifacts.filterNotNull()
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEachIndexed { i, f ->
@@ -391,7 +398,7 @@ fun ImageCard(url: String, name: String, modifier: Modifier = Modifier, height: 
     val shape = RoundedCornerShape(10.dp)
     Column(
         modifier.width(IntrinsicSize.Max).widthIn(max = 280.dp).clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)
-            .then(if (viewer != null) Modifier.clickable { viewer(listOf(Artifact(name, url)), 0) } else Modifier),
+            .then(if (viewer != null) Modifier.clickable { viewer(listOf(Artifact(name, url, Artifact.Kind.Image)), 0) } else Modifier),
     ) {
         RemoteImage(url, name, Modifier.widthIn(min = 120.dp, max = 280.dp).height(height).fillMaxWidth(), ContentScale.Crop)
         if (caption) {
@@ -421,7 +428,7 @@ fun ReplyOutputs(paths: List<String>) {
 @Composable
 private fun ReplyFiles(files: List<Triple<String, String, Boolean>>) {
     val viewer = LocalViewer.current
-    val artifacts = files.map { (path, url) -> Artifact(path.substringAfterLast('/'), url) }
+    val artifacts = files.map { (path, url, image) -> Artifact(path.substringAfterLast('/'), url, if (image) Artifact.Kind.Image else null) }
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         files.forEachIndexed { i, (path, url, image) ->
             val folder = path.substringBeforeLast('/', "").ifBlank { null }
