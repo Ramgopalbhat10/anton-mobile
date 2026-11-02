@@ -15,7 +15,9 @@ class MessageDraft(internal val readScope: CoroutineScope? = null) {
     var text by mutableStateOf("")
         private set
 
-    fun edit(value: String) { if (!sending) text = value }
+    fun edit(value: String) { if (!sending && !attachments.locked) text = value }
+
+    internal fun clearError() { error = null }
 
     /**
      * Keep the submitted draft visible and locked until admission succeeds. A failed
@@ -28,7 +30,7 @@ class MessageDraft(internal val readScope: CoroutineScope? = null) {
         consumeDraft: Boolean = true,
         send: suspend (String, OutgoingDraft) -> Unit,
     ): Boolean {
-        if (sending || attachments.reading) return false
+        if (sending || attachments.locked || attachments.reading) return false
         val ownsDraft = consumeDraft && text == this.text && outgoing == attachments.snapshot()
         sending = true
         attachments.locked = true

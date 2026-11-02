@@ -23,6 +23,8 @@ internal class TaskAttachmentServer : AutoCloseable {
     val uploads = CopyOnWriteArrayList<Upload>()
     val admissions = CopyOnWriteArrayList<JsonObject>()
     var createStatus = 200
+    var nextSessionId = "chat-task"
+    var deleteStatus = 204
     var uploadStatus = 200
     var malformedUpload = false
     var admissionStatus = 200
@@ -38,7 +40,8 @@ internal class TaskAttachmentServer : AutoCloseable {
                 return when {
                     url.encodedPath == "/api/sessions" ->
                         if (createStatus != 200) MockResponse().setResponseCode(createStatus).setBody("Create failed")
-                        else response("""{"session":{"id":"chat-task","title":"What is this image about?"}}""")
+                        else response("""{"session":{"id":"$nextSessionId","title":"What is this image about?"}}""")
+                    url.encodedPath.startsWith("/api/sessions/") && request.method == "DELETE" -> MockResponse().setResponseCode(deleteStatus)
                     url.encodedPath.endsWith("/attachments") -> {
                         if (uploadStatus != 200) return MockResponse().setResponseCode(uploadStatus).setBody("Upload failed")
                         if (malformedUpload) return response("{}")

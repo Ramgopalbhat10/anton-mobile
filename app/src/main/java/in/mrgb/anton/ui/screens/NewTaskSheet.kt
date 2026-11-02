@@ -48,6 +48,7 @@ fun NewTaskSheet(
     onRepo: (String?) -> Unit,
     onPlanFirst: (Boolean) -> Unit,
     onStart: () -> Unit,
+    onDiscard: () -> Unit,
     onDismiss: () -> Unit,
     state: TaskCreation = remember { TaskCreation() },
 ) {
@@ -57,7 +58,8 @@ fun NewTaskSheet(
     val prompt = state.draft.text
     val model = state.model
     val reasoning = state.reasoning
-    val locked = creating || state.choicesLocked
+    val busy = creating || state.draft.sending || state.discarding
+    val locked = busy || state.choicesLocked
     var modelMenu by remember { mutableStateOf(false) }
     var addMenu by remember { mutableStateOf(false) }
     val atts = state.draft.attachments
@@ -69,16 +71,27 @@ fun NewTaskSheet(
     val focused by interaction.collectIsFocusedAsState()
     val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "prompt")
     val blind = atts.images.isNotEmpty() && Catalog.find(models, model.orEmpty())?.vision == false
-    val canStart = (prompt.isNotBlank() || atts.count > 0) && !creating && !state.draft.sending && !atts.reading && !blind
+    val canStart = (prompt.isNotBlank() || atts.count > 0) && !busy && !atts.reading && !blind
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 16.dp)) {
-        state.draft.error?.let { ErrorNotice(it, Modifier.padding(bottom = 10.dp)) }
-        if (state.sessionId != null) Text("Task created. Retry sends to the same task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
+        (state.discardError ?: state.draft.error)?.let { ErrorNotice(it, Modifier.padding(bottom = 10.dp)) }
+        if (state.sessionId != null) {
+            Text("Task created. Retry sends to the same task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
+            if (state.discardConfirmation) {
+                Text("Delete the created task and its files? Your prompt and attachments will be kept for a new task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
+                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AntonButton("Keep task", state::cancelDiscard, Modifier.weight(1f), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = !busy)
+                    AntonButton(if (state.discarding) "Deleting task…" else "Delete task", onDiscard, Modifier.weight(1f), variant = ButtonVariant.Destructive, size = ButtonSize.Sm, enabled = state.canDiscard)
+                }
+            } else {
+                AntonButton("Discard task and start new", state::requestDiscard, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = state.canDiscard)
+            }
+        }
         val shape = RoundedCornerShape(14.dp)
         Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
             AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
             BasicTextField(
-                value = prompt, onValueChange = state.draft::edit, enabled = !creating && !state.draft.sending,
+                value = prompt, onValueChange = state.draft::edit, enabled = !busy,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 80.dp).focusRequester(focus),
                 textStyle = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp, color = Anton.TextPrimary),
                 cursorBrush = SolidColor(Anton.Accent),
@@ -101,7 +114,7 @@ fun NewTaskSheet(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box {
-                    GhostIconButton(Lucide.Plus, "Attach files", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp, enabled = !creating && !state.draft.sending) { addMenu = true }
+                    GhostIconButton(Lucide.Plus, "Attach files", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp, enabled = !busy) { addMenu = true }
                     AntonDropdown(expanded = addMenu, onDismiss = { addMenu = false }, minWidth = 200.dp) {
                         MenuItem("Photo or screenshot", icon = Lucide.Image, onClick = { addMenu = false; picker.images() })
                         MenuItem("File", icon = Lucide.File, onClick = { addMenu = false; picker.files() })
@@ -165,7 +178,7 @@ fun NewTaskSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Lucide.ArrowUp, if (creating) "Starting…" else if (state.sessionId != null) "Retry sending" else "Start task",
+                        Lucide.ArrowUp, if (state.discarding) "Deleting task…" else if (creating) "Starting…" else if (state.sessionId != null) "Retry sending" else "Start task",
                         tint = if (canStart) Anton.AccentFg else Anton.TextDisabled, modifier = Modifier.size(16.dp),
                     )
                 }

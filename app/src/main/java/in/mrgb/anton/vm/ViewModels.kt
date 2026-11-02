@@ -210,4 +210,8 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     fun start() = viewModelScope.launch {
         creation.start(planFirst.value, repo.api::createSession, repo::send)
     }
+
+    fun discard() = viewModelScope.launch {
+        creation.discard(repo.api::deleteSession)
+    }
 }
