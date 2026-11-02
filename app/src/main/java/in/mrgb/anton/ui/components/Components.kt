@@ -342,10 +342,11 @@ fun GhostIconButton(
     tint: Color = Anton.IconTertiary,
     size: Dp = 36.dp,
     iconSize: Dp = 20.dp,
+    enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onClick),
+        Modifier.size(size).clip(RoundedCornerShape(8.dp)).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, label, tint = tint, modifier = Modifier.size(iconSize)) }
 }
@@ -450,6 +451,7 @@ fun SelectChip(
     chevron: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(7.dp)
     Row(
@@ -458,7 +460,7 @@ fun SelectChip(
             .clip(shape)
             .background(if (open) Anton.Pressed else Anton.InputBg)
             .border(1.dp, if (open) Anton.Accent.copy(alpha = 0.55f) else Anton.Input, shape)
-            .clickable(role = Role.DropdownList, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.DropdownList, onClick = onClick)
             .padding(start = 8.dp, end = if (chevron) 6.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -607,25 +609,27 @@ fun AntonComposer(
     modelPicker: @Composable (dismiss: () -> Unit) -> Unit = {},
     modelIcon: (@Composable () -> Unit)? = null,
     modelFacts: (@Composable () -> Unit)? = null,
-    atts: DraftAttachments = rememberDraftAttachments(),
+    draft: MessageDraft = remember { MessageDraft() },
 ) {
-    var text by remember { mutableStateOf("") }
+    val atts = draft.attachments
+    val text = draft.text
+    val busy = sending || draft.sending
     var modelMenu by remember { mutableStateOf(false) }
     var addMenu by remember { mutableStateOf(false) }
-    val picker = rememberComposerPicker { uris -> atts.attach(uris) }
+    val picker = rememberDraftPicker(draft)
     val focusManager = LocalFocusManager.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "composer")
     val shape = RoundedCornerShape(14.dp)
     val blind = atts.images.isNotEmpty() && !seesImages
-    val canSend = (text.isNotBlank() || atts.count > 0) && !sending && !blind
+    val canSend = (text.isNotBlank() || atts.count > 0) && !busy && !atts.reading && !blind
     Column(
         Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape),
     ) {
         AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
         BasicTextField(
-            value = text, onValueChange = { text = it },
+            value = text, onValueChange = draft::edit, enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
             textStyle = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp, color = Anton.TextPrimary),
             cursorBrush = SolidColor(Anton.Accent),
@@ -643,23 +647,24 @@ fun AntonComposer(
                 modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 6.dp),
             )
         }
+        draft.error?.let { ErrorNotice(it, Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp)) }
         Row(
             Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box {
-                    GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp) { addMenu = true }
+                    GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp, enabled = !busy) { addMenu = true }
                     AntonDropdown(expanded = addMenu, onDismiss = { addMenu = false }, minWidth = 200.dp) {
                         MenuItem("Photo or screenshot", icon = Lucide.Image, onClick = { addMenu = false; picker.images() })
                         MenuItem("File", icon = Lucide.File, onClick = { addMenu = false; picker.files() })
                     }
                 }
-                GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp) { picker.files() }
+                GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp, enabled = !busy) { picker.files() }
                 if (model.isNotBlank()) {
                     Spacer(Modifier.width(4.dp))
                     Box(Modifier.weight(1f, fill = false)) {
-                        SelectChip(model, onClick = { onOpenModel(); modelMenu = true }, dot = if (modelIcon == null) Anton.Accent else null, open = modelMenu, leading = modelIcon, trailing = modelFacts)
+                        SelectChip(model, onClick = { if (!busy) { onOpenModel(); modelMenu = true } }, dot = if (modelIcon == null) Anton.Accent else null, open = modelMenu, leading = modelIcon, trailing = modelFacts, enabled = !busy)
                         if (modelMenu) modelPicker { modelMenu = false }
                     }
                 }
@@ -677,8 +682,8 @@ fun AntonComposer(
                 Modifier.size(34.dp).clip(RoundedCornerShape(8.dp))
                     .background(bg)
                     .border(1.dp, if (working) Anton.DangerBorder else Color.Transparent, RoundedCornerShape(8.dp))
-                    .clickable(sendInteraction, indication = null, role = Role.Button) {
-                        if (working) onStop() else if (canSend) { onSend(text, atts.take()); text = ""; focusManager.clearFocus() }
+                    .clickable(sendInteraction, indication = null, enabled = working || canSend, role = Role.Button) {
+                        if (working) onStop() else if (canSend) { onSend(text, atts.snapshot()); focusManager.clearFocus() }
                     },
                 contentAlignment = Alignment.Center,
             ) {

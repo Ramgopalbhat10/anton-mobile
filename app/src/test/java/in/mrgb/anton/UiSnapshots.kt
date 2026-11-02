@@ -194,6 +194,34 @@ class UiSnapshots {
             .apply { eraseColor(rgb.toInt()) }
             .asImageBitmap()
 
+    // Keep all snapshots under one rule/class: layoutlib font caches are process-global.
+    @Test
+    fun imageAttachmentAfterTaskCreationAndReload() = TaskAttachmentScenes(paparazzi).imageAttachmentAfterTaskCreationAndReload()
+
+    @Test
+    fun imageOnlyAttachmentAfterReload() = TaskAttachmentScenes(paparazzi).imageOnlyAttachmentAfterReload()
+
+    @Test
+    fun mixedAttachmentsAfterReload() = TaskAttachmentScenes(paparazzi).mixedAttachmentsAfterReload()
+
+    @Test
+    fun retryThreadDraft() = TaskAttachmentScenes(paparazzi).retryThreadDraft()
+
+    @Test
+    fun retryNewTaskDraft() = TaskAttachmentScenes(paparazzi).retryNewTaskDraft()
+
+    @Test
+    fun extensionlessImageViewer() = TaskAttachmentScenes(paparazzi).extensionlessImageViewer()
+
+    @Test
+    fun confirmDiscardTask() = TaskAttachmentScenes(paparazzi).confirmDiscardTask()
+
+    @Test
+    fun discardCleanupFailure() = TaskAttachmentScenes(paparazzi).discardCleanupFailure()
+
+    @Test
+    fun newTaskAfterDiscard() = TaskAttachmentScenes(paparazzi).newTaskAfterDiscard()
+
     @Test
     fun tasksScreen() = snap {
         TasksScreen(
@@ -285,7 +313,7 @@ class UiSnapshots {
             branches = listOf("main", "devin/mobile", "anton/feature-flags"),
             defaultBranch = "main",
             models = models, planFirst = true, creating = false,
-            onRepo = {}, onPlanFirst = {}, onStart = { _, _, _, _, _, _ -> }, onDismiss = {},
+            onRepo = {}, onPlanFirst = {}, onStart = {}, onDiscard = {}, onDismiss = {},
         )
     }
 
@@ -314,10 +342,9 @@ class UiSnapshots {
 
     @Test
     fun composerAttachments() = snap {
-        val resolver = androidx.compose.ui.platform.LocalContext.current.applicationContext.contentResolver
-        val scope = androidx.compose.runtime.rememberCoroutineScope()
-        val atts = androidx.compose.runtime.remember {
-            `in`.mrgb.anton.ui.components.DraftAttachments(resolver, scope).apply {
+        val draft = androidx.compose.runtime.remember { `in`.mrgb.anton.ui.components.MessageDraft() }
+        androidx.compose.runtime.remember {
+            draft.attachments.apply {
                 images += `in`.mrgb.anton.ui.components.DraftImage(`in`.mrgb.anton.data.api.PendingUpload("screenshot-figma.png", "image/png", ByteArray(42_000)), fakeImage(0xff35507e))
                 images += `in`.mrgb.anton.ui.components.DraftImage(`in`.mrgb.anton.data.api.PendingUpload("photo-site.png", "image/png", ByteArray(18_000)), fakeImage(0xff7a3b6e))
                 files += `in`.mrgb.anton.data.api.PendingUpload("brand-guide.pdf", "application/pdf", ByteArray(1_400_000))
@@ -330,7 +357,7 @@ class UiSnapshots {
                 working = false, sending = false,
                 model = "openai/gpt-6.1-terra[fast]",
                 onSend = { _, _ -> }, onStop = {}, onOpenModel = {},
-                atts = atts,
+                draft = draft,
             )
         }
     }

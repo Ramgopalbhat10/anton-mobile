@@ -169,6 +169,16 @@ object Attachments {
 
     data class Split(val text: String, val files: List<Ref>)
 
+    /**
+     * New task sends name inline images with their saved Library path. Prefer
+     * that path's chip to a second preview. Do not match basenames: legacy or
+     * unrelated inline images can have the same name as a different upload.
+     */
+    fun inlineImages(parts: List<PartDto>, files: List<Ref>): List<PartDto> = parts.filter { p ->
+        p.type == "file" && p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank() &&
+            files.none { f -> f.image && (p.path == f.path || p.title == f.path) }
+    }
+
     private val OPEN = Regex("<attachment name=\"([^\"]*)\" path=\"([^\"]*)\" kind=\"([^\"]*)\" size=\"(\\d+)\"( library=\"project\")?>\\n?")
     private const val CLOSE = "</attachment>"
 

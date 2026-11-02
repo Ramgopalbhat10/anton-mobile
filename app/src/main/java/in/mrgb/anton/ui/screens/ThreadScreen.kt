@@ -41,6 +41,7 @@ import kotlinx.serialization.json.intOrNull
 
 /** Lets an ask card send the picked option as the reply, wherever the transcript is shown. */
 val LocalAnswer = staticCompositionLocalOf<((String) -> Unit)?> { null }
+val LocalAnswerEnabled = staticCompositionLocalOf { true }
 
 @Composable
 fun ThreadScreen(
@@ -57,6 +58,8 @@ fun ThreadScreen(
     onStop: () -> Unit,
     onModel: (model: String, reasoning: String?) -> Unit,
     onLoadModels: () -> Unit,
+    draft: MessageDraft = remember { MessageDraft() },
+    onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
 ) {
     val s = bundle?.session
     var menu by remember { mutableStateOf(false) }
@@ -103,7 +106,8 @@ fun ThreadScreen(
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(
-                LocalAnswer provides { text -> onSend(text, OutgoingDraft()) },
+                LocalAnswer provides onAnswer,
+                LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading),
                 LocalRuns provides bundle?.runs.orEmpty(),
                 LocalFilePlace provides FilePlace(sessionId = s?.id, spaceId = s?.spaceId),
             ) {
@@ -128,6 +132,7 @@ fun ThreadScreen(
                 Composer(
                     working = s?.working == true,
                     sending = sending,
+                    draft = draft,
                     onSend = onSend,
                     onStop = onAbort,
                     model = s?.model ?: "",
@@ -184,14 +189,13 @@ fun UserMessage(m: MessageDto) {
     val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
     // Attached files show as chips; the text they carry is the agent's to read.
     val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
-    val images = m.parts.filter { it.type == "file" && it.mediaType?.startsWith("image/") == true && !it.url.isNullOrBlank() }
+    val images = Attachments.inlineImages(m.parts, split.files)
     Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 images.forEach { img -> ImageCard(img.url!!, img.title ?: img.path ?: "Attached image", height = 120.dp, caption = false) }
             }
         }
-        SentAttachments(split.files)
         if (split.text.isNotBlank()) {
             Box(
                 Modifier
@@ -203,6 +207,7 @@ fun UserMessage(m: MessageDto) {
                 Text(split.text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextPrimary)
             }
         }
+        SentAttachments(split.files)
     }
 }
 
@@ -237,7 +242,7 @@ private fun PartView(p: PartDto) {
             val viewer = LocalViewer.current
             FileChip(
                 name.substringAfterLast('/'), p.mediaType, imageUrl = if (image) p.url else null,
-                onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name.substringAfterLast('/'), u)), 0) } },
+                onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name.substringAfterLast('/'), u, if (image) Artifact.Kind.Image else null)), 0) } },
             )
         }
         else -> p.text?.let { Text(it, style = Type.Small, color = Anton.TextSecondary) }
@@ -340,6 +345,7 @@ private fun AskCard(p: PartDto) {
     val recommended = (p.recommended as? JsonPrimitive)?.let { r -> r.intOrNull ?: p.options.indexOfFirst { it.label == r.content }.takeIf { it >= 0 } }
     var picked by remember(p) { mutableStateOf(if (answered) p.options.indexOfFirst { it.label == answeredLabel } else recommended ?: -1) }
     val answer = LocalAnswer.current
+    val answerEnabled = LocalAnswerEnabled.current
     AntonCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 12.dp, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
@@ -386,7 +392,7 @@ private fun AskCard(p: PartDto) {
                     AntonButton(
                         "Send answer",
                         onClick = { p.options.getOrNull(picked)?.let { answer(it.label) } },
-                        enabled = picked in p.options.indices,
+                        enabled = answerEnabled && picked in p.options.indices,
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     )
                 }
@@ -415,6 +421,7 @@ private fun Composer(
     onSend: (String, OutgoingDraft) -> Unit, onStop: () -> Unit,
     model: String, reasoning: String?, models: List<ModelDto>,
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
+    draft: MessageDraft,
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 12.dp)) {
@@ -424,7 +431,7 @@ private fun Composer(
             model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
             modelIcon = if (model.isBlank()) null else ({ ModelMark(Catalog.find(models, model), model, 13.dp) }),
             modelFacts = if (model.isBlank()) null else ({ ModelFacts(models, model, reasoning) }),
-            onSend = onSend, onStop = onStop,
+            onSend = onSend, onStop = onStop, draft = draft,
             seesImages = Catalog.find(models, model)?.vision != false,
             onOpenModel = onLoadModels,
             modelPicker = { dismiss ->

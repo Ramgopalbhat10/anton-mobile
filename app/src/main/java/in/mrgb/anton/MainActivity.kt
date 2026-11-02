@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +68,7 @@ class MainActivity : ComponentActivity() {
 private fun App() {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as AntonApp
     val back = remember { mutableStateListOf<Screen>(Screen.Tasks) }
-    var newTask by remember { mutableStateOf(false) }
+    var newTask by rememberSaveable { mutableStateOf(false) }
     val screen = back.last()
     val push: (Screen) -> Unit = { back.add(it) }
     BackHandler(enabled = back.size > 1) { back.removeAt(back.lastIndex) }
@@ -137,13 +138,15 @@ private fun App() {
                 spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
-                sending = vm.sending.collectAsState().value,
+                sending = vm.coordinatorDraft(s.id).sending,
+                draft = vm.coordinatorDraft(s.id),
                 model = vm.coordinatorModel.collectAsState().value ?: "",
                 reasoning = vm.coordinatorReasoning.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 onModel = { model, level -> vm.setCoordinatorModel(s.id, model, level) },
                 onLoadModels = vm::loadModels,
                 onSend = { text, draft -> vm.sendCoordinator(s.id, text, draft) },
+                onAnswer = { vm.answerCoordinator(s.id, it) },
                 onBack = { back.removeAt(back.lastIndex) },
             )
         }
@@ -156,10 +159,12 @@ private fun App() {
                 diffs = vm.diffs.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 reasoning = vm.reasoning.collectAsState().value,
-                sending = vm.sending.collectAsState().value,
+                sending = vm.draft.sending,
+                draft = vm.draft,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 onBack = { back.removeAt(back.lastIndex) },
                 onSend = vm::send,
+                onAnswer = vm::answer,
                 onAbort = vm::abort,
                 onStop = vm::stop,
                 onModel = vm::setModel,
@@ -196,6 +201,12 @@ private fun App() {
 
     if (newTask) {
         val vm = newTaskVm(app)
+        LaunchedEffect(vm.creation.completedId) {
+            vm.creation.consumeCompleted()?.let { id ->
+                newTask = false
+                push(Screen.Thread(id))
+            }
+        }
         AntonSheet(onDismiss = { newTask = false }, title = "New task") {
             NewTaskSheet(
                 repos = vm.repos.collectAsState().value,
@@ -203,15 +214,12 @@ private fun App() {
                 defaultBranch = vm.defaultBranch.collectAsState().value,
                 models = vm.models.collectAsState().value,
                 planFirst = vm.planFirst.collectAsState().value,
-                creating = vm.creating.collectAsState().value,
+                creating = vm.creation.draft.sending,
+                state = vm.creation,
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
-                onStart = { pid, branch, prompt, model, reasoning, draft ->
-                    vm.start(pid, branch, prompt, model, reasoning, draft) { id ->
-                        newTask = false
-                        if (id != null) push(Screen.Thread(id))
-                    }
-                },
+                onStart = { vm.start() },
+                onDiscard = { vm.discard() },
                 onDismiss = { newTask = false },
             )
         }
