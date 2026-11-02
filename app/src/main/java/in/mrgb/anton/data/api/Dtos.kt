@@ -101,9 +101,39 @@ data class MessageDto(
     val role: String = "assistant",
     val at: JsonElement? = null,
     val joined: Boolean = false,
+    /** The submission that produced it; a user message that joined a reply in hand settles under that reply's. */
+    val submissionId: String? = null,
+    /** Its reply carries usage metadata — the raw conversation's sign that it finished. */
+    val hasUsage: Boolean = false,
     val parts: List<PartDto> = emptyList(),
     /** How long the reply took (flue's message metadata); only on the raw conversation. */
     val durationMs: Long? = null,
+)
+
+/** Which submission's reply answered which — flue's settlement records. */
+@Serializable
+data class SettlementDto(
+    val submissionId: String = "",
+    val outcome: String = "",
+    val answeredBySubmissionId: String? = null,
+)
+
+/** Where in a reply the agent read a message sent while it worked (src/services/joins.ts). */
+@Serializable
+data class JoinDto(
+    val text: String = "",
+    val afterTool: String = "",
+    val final: Boolean = false,
+    val at: String = "",
+)
+
+@Serializable
+data class JoinsResponse(val joins: List<JoinDto> = emptyList())
+
+/** The raw conversation: messages plus the settlements that say which reply answered each submission. */
+data class ConversationDto(
+    val messages: List<MessageDto> = emptyList(),
+    val settlements: List<SettlementDto> = emptyList(),
 )
 
 @Serializable

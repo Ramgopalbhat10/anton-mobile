@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,12 +26,15 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.FileDiff
+import `in`.mrgb.anton.data.api.JoinDto
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.Outputs
 import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
+import `in`.mrgb.anton.data.api.SettlementDto
+import `in`.mrgb.anton.data.api.placeJoined
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
@@ -52,6 +56,8 @@ fun ThreadScreen(
     reasoning: String?,
     sending: Boolean,
     webUrl: String,
+    joins: List<JoinDto> = emptyList(),
+    settlements: List<SettlementDto> = emptyList(),
     onBack: () -> Unit,
     onSend: (String, OutgoingDraft) -> Unit,
     onAbort: () -> Unit,
@@ -101,8 +107,14 @@ fun ThreadScreen(
         }
         if (showDiffs) ChangesView(diffs) { showDiffs = false }
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val working = s?.working == true
+        // The reply being written: the last assistant message, until the runtime stamps its usage.
+        val liveReply = if (working) messages.lastOrNull { it.role == "assistant" && !it.hasUsage } else null
+        val answeredBy = remember(settlements) { settlements.associate { it.submissionId to it.answeredBySubmissionId } }
+        // Messages sent while the agent worked move into the reply it was writing, where it read them.
+        val rows = remember(messages, joins, answeredBy, liveReply) { placeJoined(messages, joins, answeredBy, liveReply) }
         // Keep the tail of the transcript visible as messages arrive and stream in.
-        val tailSize = messages.size + messages.lastOrNull().let { m -> m?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
+        val tailSize = rows.size + rows.lastOrNull().let { r -> r?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(
@@ -112,16 +124,27 @@ fun ThreadScreen(
                 LocalFilePlace provides FilePlace(sessionId = s?.id, spaceId = s?.spaceId),
             ) {
             LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
-                val lastAgent = messages.lastOrNull()?.takeIf { it.role != "user" }
-                items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") UserMessage(m) else AgentMessage(m, live = s?.working == true && m === lastAgent)
+                items(rows, key = { it.key.ifBlank { it.message.hashCode().toString() } }) { row ->
+                    val m = row.message
+                    when {
+                        m.role == "user" -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            UserMessage(m)
+                            if (row.joined) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Lucide.CornerDownRight, null, tint = Anton.TextDisabled, modifier = Modifier.size(11.dp).scale(1f, -1f))
+                                    Text("Sent while Anton worked — read here", style = Type.Meta, color = Anton.TextTertiary)
+                                }
+                            }
+                        }
+                        else -> AgentMessage(m, parts = row.parts, live = liveReply != null && row.last && (m === liveReply || (liveReply.id.isNotBlank() && m.id == liveReply.id)), durationMs = if (row.last) m.durationMs else null)
+                    }
                 }
                 if (diffs.isNotEmpty()) item { DiffCard(diffs) { showDiffs = true } }
                 bundle?.pullRequest?.let { pr -> item { PrCard(pr, s) } }
                 bundle?.waiting?.lastOrNull()?.let { w ->
                     item { QueuedNote(w.text) }
                 }
-                if (s?.working == true && lastAgent == null) {
+                if (working && liveReply == null) {
                     item { TraceRow("Working on your reply…", live = true) }
                 }
             }
@@ -217,12 +240,12 @@ fun UserMessage(m: MessageDto) {
  * real response — then what it made for you.
  */
 @Composable
-fun AgentMessage(m: MessageDto, live: Boolean = false) {
-    val (work, rest) = remember(m.parts) { splitReply(m.parts) }
-    val outputs = remember(m.parts) { Outputs.ofReply(m.parts) }
+fun AgentMessage(m: MessageDto, parts: List<PartDto> = m.parts, live: Boolean = false, durationMs: Long? = m.durationMs) {
+    val (work, rest) = remember(parts) { splitReply(parts) }
+    val outputs = remember(parts) { Outputs.ofReply(parts) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (work.isNotEmpty()) {
-            WorkCard(work, live = live && m.parts.lastOrNull()?.type in setOf("reasoning", "tool"), durationMs = m.durationMs) { text ->
+            WorkCard(work, live = live && parts.lastOrNull()?.type in setOf("reasoning", "tool"), durationMs = durationMs) { text ->
                 Markdown(text, colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
             }
         }
@@ -383,9 +406,11 @@ private fun AskCard(p: PartDto) {
                             if (on) Icon(Lucide.Check, null, tint = Anton.AccentFg, modifier = Modifier.size(13.dp))
                             else Text("${i + 1}", style = Type.Num.copy(fontSize = 11.5.sp), color = Anton.TextTertiary)
                         }
-                        Text(opt.label, style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 20.sp), color = Anton.TextPrimary, modifier = Modifier.weight(1f))
-                        val hint = opt.hint ?: if (i == recommended) "recommended" else null
-                        hint?.let { Text(it, style = Type.Meta, color = Anton.TextDisabled, maxLines = 1) }
+                        Column(Modifier.weight(1f)) {
+                            Text(opt.label, style = Type.Body.copy(fontSize = 13.5.sp, lineHeight = 20.sp), color = Anton.TextPrimary)
+                            opt.hint?.let { Text(it, style = Type.Meta, color = Anton.TextTertiary) }
+                        }
+                        if (i == recommended) Badge("Recommended", Tone.Accent)
                     }
                 }
                 if (!answered && answer != null) {

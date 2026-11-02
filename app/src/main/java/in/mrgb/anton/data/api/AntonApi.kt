@@ -122,12 +122,15 @@ class AntonApi(private val config: () -> ServerConfig) {
 
     /**
      * A task's conversation as the web reads it (flue's own shape, with tool
-     * call ids, errors and reply durations); the facade's trimmed copy when
-     * the agent router can't be reached.
+     * call ids, errors, reply durations and its settlements); the facade's
+     * trimmed copy when the agent router can't be reached.
      */
-    suspend fun threadMessages(id: String): List<MessageDto> =
-        runCatching { Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
-            .getOrNull()?.takeIf { it.isNotEmpty() } ?: messages(id)
+    suspend fun threadConversation(id: String): ConversationDto =
+        runCatching { Transcript.conversationOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
+            .getOrNull()?.takeIf { it.messages.isNotEmpty() } ?: ConversationDto(messages(id))
+
+    /** Where the agent read each message sent while it worked, so the thread can show it there. */
+    suspend fun sessionJoins(id: String): List<JoinDto> = get<JoinsResponse>("/api/sessions/$id/joins").joins
 
     /** The task's workspace diff as a unified patch — the same route the web's Changes tab reads. */
     suspend fun sessionChanges(id: String, branch: Boolean = false): ChangesResponse =

@@ -12,3 +12,4 @@ captures/
 *.aab
 app/release/
 .kotlin/
+screenshots/
