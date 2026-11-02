@@ -276,6 +276,9 @@ class UiSnapshots {
     fun coordinatorLargeText() = CoordinatorScenes(paparazzi).largeText()
 
     @Test
+    fun coordinatorTailScrolling() = CoordinatorScrollScenes(paparazzi).tallRepliesAndUserPosition()
+
+    @Test
     fun threadView() = snap {
         ThreadScreen(
             bundle = SessionBundleDto(session = tasks[2], pullRequest = prJson),
