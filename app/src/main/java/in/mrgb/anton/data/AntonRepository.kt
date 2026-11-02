@@ -46,17 +46,21 @@ class AntonRepository(val api: AntonApi) {
     suspend fun space(id: String): SpaceDetailDto = api.space(id)
 
     /**
-     * A message to a task's agent: its files upload to the task's Library
-     * (uploads/) first, and the body carries each as an <attachment> block —
-     * the same flow as the web's thread composer.
+     * A message to a task's agent: images and files upload to its Library
+     * (uploads/) first, and the body carries each as an <attachment> block.
+     * Images also go inline for vision; their filename is the saved path so
+     * the transcript can associate each inline image with its Library chip.
      */
     suspend fun send(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) {
-        val attached = coroutineScope { outgoing.files.map { async { api.attachToTask(id, it) } }.map { it.await() } }
-        // A message of only pictures still needs words (the web's IMAGE_ONLY).
-        val typed = text.trim().ifBlank {
-            if (attached.isEmpty() && outgoing.images.isNotEmpty()) "Look at the attached image." else ""
+        val attached = coroutineScope {
+            (outgoing.images + outgoing.files).map { async { api.attachToTask(id, it) } }.map { it.await() }
         }
-        api.sendMessage(id, Attachments.withAttachments(typed, attached, project = false), outgoing.images)
+        // Base this on the draft, not the uploaded refs (which now include images).
+        val typed = text.trim().ifBlank {
+            if (outgoing.files.isEmpty() && outgoing.images.isNotEmpty()) "Look at the attached image." else ""
+        }
+        val images = outgoing.images.mapIndexed { i, image -> image.copy(name = attached[i].path) }
+        api.sendMessage(id, Attachments.withAttachments(typed, attached, project = false), images)
     }
 
     /**

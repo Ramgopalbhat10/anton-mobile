@@ -184,14 +184,13 @@ fun UserMessage(m: MessageDto) {
     val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
     // Attached files show as chips; the text they carry is the agent's to read.
     val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
-    val images = m.parts.filter { it.type == "file" && it.mediaType?.startsWith("image/") == true && !it.url.isNullOrBlank() }
+    val images = Attachments.inlineImages(m.parts, split.files)
     Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 images.forEach { img -> ImageCard(img.url!!, img.title ?: img.path ?: "Attached image", height = 120.dp, caption = false) }
             }
         }
-        SentAttachments(split.files)
         if (split.text.isNotBlank()) {
             Box(
                 Modifier
@@ -203,6 +202,7 @@ fun UserMessage(m: MessageDto) {
                 Text(split.text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextPrimary)
             }
         }
+        SentAttachments(split.files)
     }
 }
 

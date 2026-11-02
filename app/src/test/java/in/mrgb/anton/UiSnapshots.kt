@@ -194,6 +194,16 @@ class UiSnapshots {
             .apply { eraseColor(rgb.toInt()) }
             .asImageBitmap()
 
+    // Keep all snapshots under one rule/class: layoutlib font caches are process-global.
+    @Test
+    fun imageAttachmentAfterTaskCreationAndReload() = TaskAttachmentScenes(paparazzi).imageAttachmentAfterTaskCreationAndReload()
+
+    @Test
+    fun imageOnlyAttachmentAfterReload() = TaskAttachmentScenes(paparazzi).imageOnlyAttachmentAfterReload()
+
+    @Test
+    fun mixedAttachmentsAfterReload() = TaskAttachmentScenes(paparazzi).mixedAttachmentsAfterReload()
+
     @Test
     fun tasksScreen() = snap {
         TasksScreen(
