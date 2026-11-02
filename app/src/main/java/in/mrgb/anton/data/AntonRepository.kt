@@ -2,8 +2,8 @@ package `in`.mrgb.anton.data
 
 import `in`.mrgb.anton.data.api.AntonApi
 import `in`.mrgb.anton.data.api.Attachments
+import `in`.mrgb.anton.data.api.ConversationDto
 import `in`.mrgb.anton.data.api.EventsStream
-import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SessionDto
@@ -32,7 +32,11 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun session(id: String): SessionBundleDto = api.sessionBundle(id)
 
-    suspend fun messages(id: String): List<MessageDto> = api.threadMessages(id)
+    suspend fun conversation(id: String): ConversationDto = api.threadConversation(id)
+
+    suspend fun messages(id: String) = conversation(id).messages
+
+    suspend fun joins(id: String) = api.sessionJoins(id)
 
     /** The task's file diffs: the unpushed changes, or the whole branch when nothing was pushed. */
     suspend fun sessionDiffs(id: String): List<`in`.mrgb.anton.data.api.FileDiff> {

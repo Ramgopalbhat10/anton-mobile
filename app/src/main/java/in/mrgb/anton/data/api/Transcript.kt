@@ -16,15 +16,21 @@ import kotlinx.serialization.json.longOrNull
  */
 object Transcript {
 
-    fun messagesOf(body: JsonElement): List<MessageDto> {
+    fun messagesOf(body: JsonElement): List<MessageDto> = conversationOf(body).messages
+
+    /** The raw conversation the agent router serves: messages plus its settlements. */
+    fun conversationOf(body: JsonElement): ConversationDto {
         val list = (body as? JsonObject)?.let { it["messages"] ?: it["conversation"] ?: it["state"] } ?: body
         val raw = when (list) {
             is JsonArray -> list
             is JsonObject -> list["messages"] as? JsonArray
             else -> null
-        } ?: return emptyList()
+        } ?: return ConversationDto()
         val messages = raw.mapNotNull { (it as? JsonObject)?.let(::messageOf) }
-        return withAnswers(messages)
+        val settlements = ((body as? JsonObject)?.get("settlements") as? JsonArray).orEmpty().mapNotNull {
+            (it as? JsonObject)?.let { s -> SettlementDto(s["submissionId"].str().orEmpty(), s["outcome"].str().orEmpty(), s["answeredBySubmissionId"].str()) }
+        }
+        return ConversationDto(withAnswers(messages), settlements)
     }
 
     private fun messageOf(m: JsonObject): MessageDto? {
@@ -36,12 +42,15 @@ object Transcript {
         val expanded = parts.flatMap { part ->
             if (part.type == "text" && part.text.orEmpty().contains("<thread")) threadParts(part.text!!) else listOf(part)
         }
-        val duration = ((m["metadata"] as? JsonObject)?.get("durationMs") as? JsonPrimitive)?.let { it.longOrNull ?: it.content.toDoubleOrNull()?.toLong() }
+        val metadata = m["metadata"] as? JsonObject
+        val duration = (metadata?.get("durationMs") as? JsonPrimitive)?.let { it.longOrNull ?: it.content.toDoubleOrNull()?.toLong() }
         return MessageDto(
             id = m["id"].str() ?: "",
             role = role,
             at = m["createdAt"] ?: m["sentAt"],
             joined = (m["joined"] as? JsonPrimitive)?.content == "true",
+            submissionId = m["submissionId"].str(),
+            hasUsage = metadata?.get("usage") != null && metadata["usage"] !is JsonNull,
             parts = expanded,
             durationMs = duration,
         ).takeIf { it.parts.isNotEmpty() }

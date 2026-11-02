@@ -278,6 +278,37 @@ class UiSnapshots {
     }
 
     @Test
+    fun threadJoined() = snap {
+        val reply = MessageDto(
+            "a1", "assistant", submissionId = "sub-1", hasUsage = true,
+            parts = listOf(
+                PartDto(type = "reasoning", text = "Checking the SDK sign-in path first."),
+                PartDto(type = "tool", name = "bash", toolCallId = "bash-1", state = "output-available", input = kotlinx.serialization.json.Json.parseToJsonElement("""{"command":"cursor agent login --status"}""")),
+                PartDto(type = "reasoning", text = "The local chat works; checking the account next."),
+                PartDto(type = "text", text = "A regular Agent chat works on Plus — checking your account's entitlement now."),
+            ),
+        )
+        ThreadScreen(
+            bundle = SessionBundleDto(session = tasks[2]),
+            messages = listOf(
+                MessageDto("u1", "user", submissionId = "sub-1", parts = listOf(PartDto(type = "text", text = "Why the Cursor Plus error?"))),
+                reply,
+                MessageDto("u2", "user", submissionId = "sub-2", parts = listOf(PartDto(type = "text", text = "Also try Composer 2.5"))),
+            ),
+            diffs = emptyList(),
+            models = models, reasoning = null, sending = false,
+            webUrl = "https://code.mrgb.in",
+            joins = listOf(`in`.mrgb.anton.data.api.JoinDto(text = "Also try Composer 2.5", afterTool = "bash-1")),
+            settlements = listOf(
+                `in`.mrgb.anton.data.api.SettlementDto("sub-1", "completed"),
+                `in`.mrgb.anton.data.api.SettlementDto("sub-2", "completed", answeredBySubmissionId = "sub-1"),
+            ),
+            onBack = {}, onSend = { _, _ -> }, onAbort = {}, onStop = {},
+            onModel = { _, _ -> }, onLoadModels = {},
+        )
+    }
+
+    @Test
     fun askAndSteps() = snap {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.contentWidth().padding(12.dp)) {
@@ -285,7 +316,7 @@ class UiSnapshots {
                     MessageDto(
                         "a3", "assistant", parts = listOf(
                             PartDto(type = "reasoning", text = "Weighing whether to ask before continuing."),
-                            PartDto(type = "ask", question = "Which format should the digest use?", options = listOf(AskOptionDto("HTML", "newspaper layout"), AskOptionDto("Markdown"), AskOptionDto("Plain text"))),
+                            PartDto(type = "ask", question = "Which format should the digest use?", options = listOf(AskOptionDto("HTML", "newspaper layout"), AskOptionDto("Markdown", "Keeps the digest readable in every client without extra rendering"), AskOptionDto("Plain text")), recommended = kotlinx.serialization.json.JsonPrimitive(1)),
                             PartDto(type = "text", text = "Pick a format and I'll wire the next run to it."),
                         ),
                     ),
