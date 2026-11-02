@@ -257,12 +257,43 @@ class UiSnapshots {
     fun coordinatorView() = snap {
         CoordinatorScreen(
             spaceId = "space_b", name = "mrgb",
-            messages = threadMessages,
+            messages = coordinatorFixture(),
+            threads = coordinatorThreads,
+            threadsLoaded = true,
+            cardFiles = coordinatorCardFiles,
+            onReviewThread = {},
             sending = false, model = "openai/gpt-6.1-terra[fast]", reasoning = null,
             models = models,
             onModel = { _, _ -> }, onLoadModels = {}, onSend = { _, _ -> }, onBack = {},
         )
     }
+
+    @Test
+    fun coordinatorEntries() = CoordinatorScenes(paparazzi).entries()
+
+    @Test
+    fun coordinatorInteractions() = CoordinatorScenes(paparazzi).interactions()
+
+    @Test
+    fun coordinatorLargeText() = CoordinatorScenes(paparazzi).largeText()
+
+    @Test
+    fun coordinatorTailScrolling() = CoordinatorScrollScenes(paparazzi).tallRepliesAndUserPosition()
+
+    @Test
+    fun coordinatorCreationCard() = CoordinatorCreationScenes(paparazzi).persistentCardAndFiles()
+
+    @Test
+    fun coordinatorCreationStates() = CoordinatorCreationScenes(paparazzi).states()
+
+    @Test
+    fun coordinatorReportToggleStability() = CoordinatorToggleScenes(paparazzi).reportDoesNotJump()
+
+    @Test
+    fun coordinatorReportQuestionAndBody() = CoordinatorScenes(paparazzi).questionAndBody()
+
+    @Test
+    fun coordinatorReportQuestionLargeText() = CoordinatorScenes(paparazzi).questionAndBody(large = true)
 
     @Test
     fun threadView() = snap {

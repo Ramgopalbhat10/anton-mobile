@@ -1,27 +1,24 @@
 package `in`.mrgb.anton.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
+import `in`.mrgb.anton.data.api.SessionDto
+import `in`.mrgb.anton.data.api.ThreadCardFiles
+import `in`.mrgb.anton.data.api.ThreadCardAction
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Space
-import `in`.mrgb.anton.ui.theme.Type
 
 /** A project's coordinator conversation — the web's coordinator feed, compact. */
 @Composable
@@ -39,39 +36,21 @@ fun CoordinatorScreen(
     onBack: () -> Unit,
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
+    threads: List<SessionDto> = emptyList(),
+    threadsLoaded: Boolean = false,
+    onOpenThread: (String) -> Unit = {},
+    cardFiles: Map<String, ThreadCardFiles> = emptyMap(),
+    cardActions: Map<String, ThreadCardAction> = emptyMap(),
+    onLoadFiles: (String) -> Unit = {},
+    onStopThread: ((String) -> Unit)? = null,
+    onReviewThread: ((String) -> Unit)? = null,
 ) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId)) {
-            LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
-                if (messages.isEmpty()) {
-                    item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
-                }
-                items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") {
-                        m.parts.forEach { p ->
-                            when (p.type) {
-                                "thread" -> ThreadCard(p)
-                                "file" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                    val name = p.title ?: p.path?.substringAfterLast('/') ?: "attachment"
-                                    val viewer = LocalViewer.current
-                                    if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, name, height = 120.dp, caption = false)
-                                    else FileChip(
-                                        name, p.mediaType,
-                                        onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name, u)), 0) } },
-                                    )
-                                }
-                                else -> UserMessage(m.copy(parts = listOf(p)))
-                            }
-                        }
-                    } else AgentMessage(m)
-                }
-            }
+            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId),
+                LocalCoordinatorCards provides CoordinatorCardHost(cardFiles, cardActions, onLoadFiles, onStopThread, onReviewThread)) {
+            key(spaceId) { CoordinatorTimeline(messages, threads, threadsLoaded, onOpenThread) }
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -91,5 +70,31 @@ fun CoordinatorScreen(
                 )
             }
         }
+    }
+}
+
+/** Native timeline, with state hoistable for actual lazy-layout regression tests. */
+@Composable
+internal fun CoordinatorTimeline(
+    messages: List<MessageDto>,
+    threads: List<SessionDto> = emptyList(),
+    threadsLoaded: Boolean = false,
+    onOpenThread: (String) -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
+    tailFollow: CoordinatorTailFollow = remember { CoordinatorTailFollow() },
+) {
+    val cards = LocalCoordinatorCards.current
+    FollowCoordinatorTail(listState, tailFollow, Triple(messages, threads, cards.files))
+    CompositionLocalProvider(LocalCoordinatorReportToggle provides tailFollow::pauseForToggle) {
+    LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
+        if (messages.isEmpty()) {
+            item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
+        }
+        items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
+            CoordinatorMessage(m, threads, threadsLoaded, onOpenThread)
+        }
+        // Target the end, including a tall final message and trailing content padding.
+        item(key = "coordinator-tail-anchor") { Spacer(Modifier.height(0.dp)) }
+    }
     }
 }

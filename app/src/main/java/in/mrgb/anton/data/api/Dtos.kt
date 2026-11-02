@@ -149,6 +149,8 @@ data class PartDto(
     val recommended: JsonElement? = null,
     val answer: JsonElement? = null,
     val hint: String? = null,
+    /** Coordinator news: preserve the report batch and each thread's creation origin. */
+    val reports: List<ThreadReportDto> = emptyList(),
     /** Tool calls: what was called with, what came back, and how it failed. */
     val input: JsonElement? = null,
     val output: JsonElement? = null,
@@ -261,3 +263,25 @@ data class CreateSessionRequest(
 
 @Serializable
 data class AgentMessageRequest(val message: String)
+
+@Serializable
+data class ThreadReportDto(
+    val id: String = "",
+    val title: String = "Thread",
+    val state: String = "idle",
+    val text: String = "",
+    val started: String? = null,
+    val pr: String? = null,
+    /** The historical question can accompany a separate report body. */
+    val asks: String? = null,
+)
+
+/** Complete task Library listing; uploads are filtered by the card, not the API. */
+@Serializable
+data class ThreadOutputDto(val path: String, val size: Long = 0, val mtimeMs: Double = 0.0)
+@Serializable
+data class ThreadOutputsDto(val outputs: List<ThreadOutputDto> = emptyList())
+
+/** Nullable files distinguish not-yet-loaded from a genuinely empty Library. */
+data class ThreadCardFiles(val files: List<ThreadOutputDto>? = null, val loading: Boolean = false, val error: String? = null)
+data class ThreadCardAction(val pending: Boolean = false, val error: String? = null)

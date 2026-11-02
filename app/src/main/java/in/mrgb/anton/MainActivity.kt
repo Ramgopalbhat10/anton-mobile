@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.mrgb.anton.ui.components.AntonSheet
@@ -43,7 +44,7 @@ private sealed class Screen {
     data object Projects : Screen()
     data object Activity : Screen()
     data object Settings : Screen()
-    data class Thread(val id: String) : Screen()
+    data class Thread(val id: String, val review: Boolean = false) : Screen()
     data class Project(val id: String) : Screen()
     data class Coordinator(val id: String, val name: String) : Screen()
 }
@@ -123,7 +124,10 @@ private fun App() {
         }
         is Screen.Project -> {
             val vm = projectsVm(app)
-            LaunchedEffect(s.id) { vm.open(s.id) }
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             ProjectDetailScreen(
                 space = vm.detail.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
@@ -134,10 +138,22 @@ private fun App() {
         }
         is Screen.Coordinator -> {
             val vm = projectsVm(app)
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             CoordinatorScreen(
                 spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
+                threads = vm.threads.collectAsState().value,
+                threadsLoaded = vm.threadsLoaded.collectAsState().value,
+                cardFiles = vm.cardFiles.collectAsState().value,
+                cardActions = vm.cardActions.collectAsState().value,
+                onLoadFiles = { vm.loadThreadFiles(it) },
+                onStopThread = { vm.stopCoordinatorThread(it) },
+                onReviewThread = { push(Screen.Thread(it, review = true)) },
+                onOpenThread = { push(Screen.Thread(it)) },
                 sending = vm.coordinatorDraft(s.id).sending,
                 draft = vm.coordinatorDraft(s.id),
                 model = vm.coordinatorModel.collectAsState().value ?: "",
@@ -161,6 +177,7 @@ private fun App() {
                 reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.draft.sending,
                 draft = vm.draft,
+                initialShowDiffs = s.review,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 joins = vm.joins.collectAsState().value,
                 settlements = vm.settlements.collectAsState().value,

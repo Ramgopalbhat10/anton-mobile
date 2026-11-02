@@ -13,20 +13,32 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 /**
  * One repository over the mobile facade + SSE. Views collect StateFlows the
  * repository keeps warm; an SSE `sessions`/`spaces` change just flips a refresh
  * signal — the screens refetch rather than merge payloads.
  */
-class AntonRepository(val api: AntonApi) {
+class AntonRepository(val api: AntonApi, changeEvents: Flow<EventsStream.Event.Change>? = null) {
 
     /** Any server change, as named by /api/events. Restarts with backoff when the stream drops. */
-    val changes: Flow<EventsStream.Event.Change> = EventsStream.stream(api)
-        .retryWhen { _, _ -> delay(3_000); true }
-        .filterIsInstance<EventsStream.Event.Change>()
+    val changes: Flow<EventsStream.Event.Change> = changeEvents ?: flow {
+        while (currentCoroutineContext().isActive) {
+            EventsStream.stream(api).catch { /* Retry both errors and clean EOF. */ }.collect { event ->
+                when (event) {
+                    // Reconnecting is an invalidation too: changes may have been missed offline.
+                    EventsStream.Event.Open -> emit(EventsStream.Event.Change("sessions", null))
+                    is EventsStream.Event.Change -> emit(event)
+                    else -> Unit
+                }
+            }
+            delay(3_000)
+        }
+    }
 
     suspend fun sessions(): List<SessionDto> = api.sessions()
 
