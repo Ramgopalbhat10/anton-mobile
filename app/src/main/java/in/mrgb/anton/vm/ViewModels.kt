@@ -9,16 +9,12 @@ import `in`.mrgb.anton.ui.screens.TasksTab
 import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class TasksViewModel(private val repo: AntonRepository) : ViewModel() {
     private val _sessions = MutableStateFlow<List<SessionDto>>(emptyList())
@@ -89,7 +85,10 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     fun refresh() = viewModelScope.launch {
         runCatching { repo.session(sessionId) }.onSuccess { _bundle.value = it }.onFailure { error.value = it.message }
         runCatching { repo.conversation(sessionId) }.onSuccess { _messages.value = it.messages; _settlements.value = it.settlements }
-        runCatching { repo.joins(sessionId) }.onSuccess { _joins.value = it }
+        // Only a message that joined another reply, or one sent while the agent works, can need moving.
+        val joined = _settlements.value.any { it.answeredBySubmissionId != null && it.answeredBySubmissionId != it.submissionId }
+        if (joined || _bundle.value?.session?.working == true) runCatching { repo.joins(sessionId) }.onSuccess { _joins.value = it }
+        else _joins.value = emptyList()
         runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
     }
 
@@ -102,7 +101,7 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     fun answer(text: String) = submit(text, OutgoingDraft(), consumeDraft = false)
 
     private fun submit(text: String, outgoing: OutgoingDraft, consumeDraft: Boolean) = viewModelScope.launch {
-        if (draft.deliver(text, outgoing, consumeDraft) { body, files -> repo.send(sessionId, body, files) }) refresh()
+        if (draft.deliver(text, outgoing, consumeDraft) { body, files -> repo.send(sessionId, body, files, draft.uploads) }) refresh()
     }
 
     fun abort() = viewModelScope.launch {
@@ -132,18 +131,12 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     val threads = _threads.asStateFlow()
     val error = MutableStateFlow<String?>(null)
     val threadsLoaded = MutableStateFlow(false)
-    private var activeSpace: String? = null
-    private var generation = 0
-    private var watching: Job? = null
-    private var invalidations: Channel<Unit>? = null
-    val cardFiles = MutableStateFlow<Map<String, ThreadCardFiles>>(emptyMap())
     val cardActions = MutableStateFlow<Map<String, ThreadCardAction>>(emptyMap())
-    private var cardScope: CoroutineScope? = null
-    private val fileJobs = mutableMapOf<String, Job>()
-    private val fileRequested = mutableSetOf<String>()
-    private val fileDirty = mutableSetOf<String>()
-    private val fileLastLoad = mutableMapOf<String, Long>()
-    private val filePermits = Semaphore(4)
+    private var activeSpace: String? = null
+    private var watching: Job? = null
+    private var reloads: Channel<Unit>? = null
+    private val transcriptLock = Mutex()
+    private var transcriptChangedAt = 0L
 
     init { refresh() }
 
@@ -171,14 +164,13 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
         runCatching { repo.api.setCoordinatorModel(spaceId, model, reasoning) }
     }
 
-    /** Owned by the visible project's STARTED lifecycle, not the lifetime of this shared VM. */
+    /**
+     * Keeps the open project fresh while its screen is started; the caller cancels
+     * the job when the screen stops. A new watch cancels the old one, so a late
+     * response from another project can never land.
+     */
     fun watch(id: String): Job {
         watching?.cancel()
-        val token = ++generation
-        fileJobs.clear()
-        fileLastLoad.clear()
-        fileDirty.clear()
-        cardActions.value = emptyMap()
         if (activeSpace != id) {
             activeSpace = id
             _detail.value = null
@@ -187,119 +179,100 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             coordinatorMessages.value = emptyList()
             coordinatorModel.value = null
             coordinatorReasoning.value = null
-            cardFiles.value = emptyMap()
-            cardActions.value = emptyMap()
-            fileRequested.clear()
         }
+        cardActions.value = emptyMap()
         return viewModelScope.launch {
             loadModels()
-            coroutineScope {
-                val signals = Channel<Unit>(Channel.CONFLATED)
-                cardScope = this
-                invalidations = signals
-                signals.trySend(Unit)
-                launch {
-                    repo.changes.collect { e ->
-                        if (e.name == "task" && e.id in fileRequested && e.what in setOf("files", "state")) loadThreadFiles(e.id!!, force = true)
-                        if (e.name == "sessions" || e.name == "spaces" ||
-                            (e.name == "space" && (e.id == null || e.id == id)) ||
-                            (e.name == "task" && (e.id == null || _threads.value.any { it.id == e.id }))) signals.trySend(Unit)
-                    }
-                }
-                // The coarse events do not stream coordinator tokens. Poll while visible,
-                // including after admission, and as a safety net for silent SSE loss.
-                launch { while (true) { delay(2_000); signals.trySend(Unit) } }
-                try {
-                    for (ignored in signals) loadProject(id, token)
-                } finally {
-                    signals.close()
-                    if (generation == token) {
-                        invalidations = null
-                        cardScope = null
-                        cardFiles.update { map -> map.mapValues { it.value.copy(loading = false) } }
-                    }
+            val signals = Channel<Unit>(Channel.CONFLATED).also { reloads = it }
+            launch {
+                repo.changes.collect { e ->
+                    if (e.name == "sessions" || e.name == "spaces" ||
+                        (e.name == "space" && (e.id == null || e.id == id)) ||
+                        (e.name == "task" && (e.id == null || _threads.value.any { it.id == e.id }))) signals.trySend(Unit)
                 }
             }
+            // The event stream doesn't carry the coordinator's reply as it's written, so poll
+            // just its transcript while a reply is in flight. A full reload every 16s covers
+            // an event stream that dropped without telling us.
+            launch {
+                var tick = 0
+                while (true) {
+                    delay(2_000)
+                    if (++tick % 8 == 0) signals.trySend(Unit)
+                    else if (coordinatorReplying()) quietly { loadTranscript(id) }
+                }
+            }
+            signals.trySend(Unit)
+            for (ignored in signals) loadProject(id)
         }.also { watching = it }
     }
 
-    private suspend fun loadProject(id: String, token: Int) {
-        // Serialize refreshes. A signal arriving during an HTTP read is retained by
-        // the conflated channel, so creation is refetched rather than merged as a row.
-        var failed = false
-        suspend fun <T> read(fetch: suspend () -> T, apply: (T) -> Unit) {
-            try {
-                val result = fetch()
-                coroutineContext.ensureActive()
-                if (generation == token && activeSpace == id) apply(result)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { failed = true; if (generation == token) error.value = e.message }
-        }
-        read({ repo.space(id) }) { _detail.value = it; coordinatorModel.value = it.coordinatorModel; coordinatorReasoning.value = it.coordinatorReasoning }
-        read({ repo.sessions() }) { _threads.value = it.filter { row -> row.spaceId == id }; threadsLoaded.value = true }
-        read({ repo.api.spaceMessages(id) }) { coordinatorMessages.value = it }
-        if (!failed && generation == token) error.value = null
-        if (generation == token) fileRequested.toList().forEach { loadThreadFiles(it) }
+    /** A reply is in flight: yours has no answer yet, or the last answer has no usage stamped. Give up after a quiet minute. */
+    private fun coordinatorReplying(): Boolean {
+        val last = coordinatorMessages.value.lastOrNull()
+        val open = last == null || last.role == "user" || !last.hasUsage
+        return open && System.currentTimeMillis() - transcriptChangedAt < 60_000
     }
 
-    /** Only cards actually encountered in the feed request their Library; duplicate cards share it. */
-    fun loadThreadFiles(threadId: String, force: Boolean = false): Job? {
-        val scope = cardScope ?: return null
-        if (_threads.value.none { it.id == threadId }) return null
-        fileRequested += threadId
-        if (fileJobs[threadId]?.isActive == true) {
-            if (force) fileDirty += threadId
-            return fileJobs[threadId]
+    private suspend fun loadTranscript(id: String) = transcriptLock.withLock {
+        val messages = repo.api.spaceMessages(id)
+        if (activeSpace == id && messages != coordinatorMessages.value) {
+            coordinatorMessages.value = messages
+            transcriptChangedAt = System.currentTimeMillis()
         }
-        val now = System.currentTimeMillis()
-        if (!force && cardFiles.value[threadId]?.error == null && now - (fileLastLoad[threadId] ?: 0) < 30_000) return null
-        val token = generation
-        fileLastLoad[threadId] = now
-        cardFiles.update { it + (threadId to (it[threadId] ?: ThreadCardFiles()).copy(loading = true, error = null)) }
-        return scope.launch {
-            try {
-                val files = filePermits.withPermit { repo.api.threadOutputs(threadId) }
-                coroutineContext.ensureActive()
-                if (generation == token) cardFiles.update { it + (threadId to ThreadCardFiles(files)) }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                if (generation == token) cardFiles.update { it + (threadId to (it[threadId] ?: ThreadCardFiles()).copy(loading = false, error = "Couldn't load files")) }
-            } finally {
-                if (generation == token) {
-                    fileJobs.remove(threadId)
-                    if (fileDirty.remove(threadId)) loadThreadFiles(threadId, force = true)
-                }
-            }
-        }.also { fileJobs[threadId] = it }
+    }
+
+    private suspend fun loadProject(id: String) {
+        var failed = false
+        suspend fun read(load: suspend () -> Unit) {
+            if (!quietly(load)) failed = true
+        }
+        read { repo.space(id).let { if (activeSpace == id) { _detail.value = it; coordinatorModel.value = it.coordinatorModel; coordinatorReasoning.value = it.coordinatorReasoning } } }
+        read { repo.sessions().let { if (activeSpace == id) { _threads.value = it.filter { row -> row.spaceId == id }; threadsLoaded.value = true } } }
+        read { loadTranscript(id) }
+        if (!failed) error.value = null
+    }
+
+    /** Runs a load, keeping the last good data and showing the error if it fails. */
+    private suspend fun quietly(load: suspend () -> Unit): Boolean = try {
+        load()
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        error.value = e.message
+        false
     }
 
     fun stopCoordinatorThread(threadId: String) = viewModelScope.launch {
         val thread = _threads.value.firstOrNull { it.id == threadId } ?: return@launch
         if (thread.threadState != "working" && !thread.working) return@launch
         if (cardActions.value[threadId]?.pending == true) return@launch
-        val token = generation
         cardActions.update { it + (threadId to ThreadCardAction(pending = true)) }
         try {
             repo.abort(threadId)
-            if (generation == token) invalidations?.trySend(Unit)
-            if (generation == token) cardActions.update { it + (threadId to ThreadCardAction()) }
+            cardActions.update { it + (threadId to ThreadCardAction()) }
+            reloads?.trySend(Unit)
         } catch (e: CancellationException) {
-            if (generation == token) cardActions.update { it - threadId }
+            cardActions.update { it - threadId }
             throw e
         } catch (e: Exception) {
-            if (generation == token) cardActions.update { it + (threadId to ThreadCardAction(error = "Couldn't stop replying. Try again.")) }
+            cardActions.update { it + (threadId to ThreadCardAction(error = "Couldn't stop replying. Try again.")) }
         }
     }
 
     fun refreshCoordinator(id: String) = viewModelScope.launch {
-        if (activeSpace == id) invalidations?.trySend(Unit)
+        if (activeSpace != id) return@launch
+        transcriptChangedAt = System.currentTimeMillis() // A send just went in: poll for its reply.
+        reloads?.trySend(Unit)
     }
 
     fun sendCoordinator(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) = submitCoordinator(id, text, outgoing, consumeDraft = true)
     fun answerCoordinator(id: String, text: String) = submitCoordinator(id, text, OutgoingDraft(), consumeDraft = false)
 
     private fun submitCoordinator(id: String, text: String, outgoing: OutgoingDraft, consumeDraft: Boolean) = viewModelScope.launch {
-        if (coordinatorDraft(id).deliver(text, outgoing, consumeDraft) { body, files -> repo.sendCoordinator(id, body, files) }) refreshCoordinator(id)
+        val draft = coordinatorDraft(id)
+        if (draft.deliver(text, outgoing, consumeDraft) { body, files -> repo.sendCoordinator(id, body, files, draft.uploads) }) refreshCoordinator(id)
     }
 }
 
@@ -349,10 +322,6 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
     fun start() = viewModelScope.launch {
-        creation.start(planFirst.value, repo.api::createSession, repo::send)
-    }
-
-    fun discard() = viewModelScope.launch {
-        creation.discard(repo.api::deleteSession)
+        creation.start(planFirst.value, repo.api::createSession) { id, text, outgoing -> repo.send(id, text, outgoing, creation.draft.uploads) }
     }
 }

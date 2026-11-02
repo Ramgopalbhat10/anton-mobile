@@ -3,9 +3,6 @@ package `in`.mrgb.anton.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -125,12 +122,7 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
         CoordinatorCreationCard(entry, onOpen)
         return
     }
-    val beforeToggle = LocalCoordinatorReportToggle.current
     val shape = RoundedCornerShape(8.dp)
-    val headerInteractions = remember { MutableInteractionSource() }
-    val previewInteractions = remember { MutableInteractionSource() }
-    val headerFocused by headerInteractions.collectIsFocusedAsState()
-    val previewFocused by previewInteractions.collectIsFocusedAsState()
     val statusColor = when (entry.glyph) {
         GlyphKind.Idle, GlyphKind.Resolved, GlyphKind.Queued -> Anton.TextSecondary
         GlyphKind.Failed -> Anton.DangerText
@@ -139,9 +131,9 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier.fillMaxWidth().clip(shape)
-                .background(if (entry.creation) Anton.CardBg else Anton.WellBg)
-                .border(if (headerFocused) 2.dp else 1.dp, if (headerFocused) Anton.Accent else if (entry.creation) Anton.CardBorder else Anton.BorderSubtle, shape)
-                .clickable(interactionSource = headerInteractions, indication = LocalIndication.current, role = Role.Button, onClickLabel = if (expanded) "Collapse preview" else "Expand preview", onClick = { beforeToggle(); onToggle() })
+                .background(Anton.WellBg)
+                .border(1.dp, Anton.BorderSubtle, shape)
+                .clickable(role = Role.Button, onClickLabel = if (expanded) "Collapse preview" else "Expand preview", onClick = onToggle)
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                 .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -154,9 +146,9 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
         if (expanded) {
             val open = { entry.threadId?.let(onOpen); Unit }
             Column(
-                Modifier.padding(start = if (entry.creation) 0.dp else 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(Anton.WellBg).border(if (previewFocused) 2.dp else 1.dp, if (previewFocused) Anton.Accent else Anton.BorderSubtle, RoundedCornerShape(10.dp))
-                    .clickable(interactionSource = previewInteractions, indication = LocalIndication.current, enabled = entry.threadId != null, role = Role.Button, onClickLabel = "Open thread", onClick = open)
+                Modifier.padding(start = 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .background(Anton.WellBg).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))
+                    .clickable(enabled = entry.threadId != null, role = Role.Button, onClickLabel = "Open thread", onClick = open)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {

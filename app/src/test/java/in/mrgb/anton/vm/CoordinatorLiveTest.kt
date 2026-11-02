@@ -24,8 +24,6 @@ class CoordinatorLiveTest {
         @Volatile var sessions = "[]"
         @Volatile var transcript = "[]"
         @Volatile var fail = false
-        @Volatile var outputs = "[]"
-        @Volatile var outputStatus = 200
         @Volatile var abortStatus = 200
         @Volatile var blockSpace: String? = null
         val blocked = CountDownLatch(1)
@@ -39,8 +37,6 @@ class CoordinatorLiveTest {
                     requests += path
                     if (path == "/api/mobile/spaces/$blockSpace") { blocked.countDown(); release.await(5, TimeUnit.SECONDS) }
                     if (fail && request.method == "GET") return MockResponse().setResponseCode(503)
-                    if (path.endsWith("/outputs")) return MockResponse().setResponseCode(outputStatus)
-                        .setBody("{\"outputs\":$outputs}").setBodyDelay(200, TimeUnit.MILLISECONDS)
                     if (path.endsWith("/abort")) return MockResponse().setResponseCode(abortStatus).setBody("{}").setBodyDelay(200, TimeUnit.MILLISECONDS)
                     val body = when {
                         path == "/api/mobile/spaces" -> "{\"spaces\":[]}"
@@ -99,47 +95,6 @@ class CoordinatorLiveTest {
         } finally { Dispatchers.resetMain() }
     }
 
-    @Test fun visibleCreationCardsShareFilesRefreshOnEventsAndRecoverFromFailures() = runBlocking {
-        val dispatcher = UnconfinedTestDispatcher()
-        Dispatchers.setMain(dispatcher)
-        try {
-            Server().use { server ->
-                server.sessions = """[{"id":"thread1","spaceId":"project1"},{"id":"thread2","spaceId":"project1"}]"""
-                server.outputs = """[{"path":"first.md","mtimeMs":1}]"""
-                val vm = ProjectsViewModel(server.repo)
-                try {
-                    vm.watch("project1")
-                    await { vm.threadsLoaded.value }
-                    assertTrue(vm.cardFiles.value.isEmpty()) // No indiscriminate per-thread hydration.
-                    vm.loadThreadFiles("thread1")
-                    vm.loadThreadFiles("thread1")
-                    await { vm.cardFiles.value["thread1"]?.files != null }
-                    assertEquals(1, server.requests.count { it == "/api/sessions/thread1/outputs" })
-                    assertEquals(0, server.requests.count { it == "/api/sessions/thread2/outputs" })
-                    dispatcher.scheduler.advanceTimeBy(2001)
-                    delay(100)
-                    assertEquals(1, server.requests.count { it.endsWith("/outputs") })
-                    server.outputs = """[{"path":"new.apk","mtimeMs":2}]"""
-                    server.signal("""{"kind":"task","id":"thread1","what":"files"}""")
-                    await { vm.cardFiles.value["thread1"]?.files?.firstOrNull()?.path == "new.apk" }
-                    server.outputStatus = 503
-                    server.signal("""{"kind":"task","id":"thread1","what":"files"}""")
-                    await { vm.cardFiles.value["thread1"]?.error != null }
-                    assertEquals("new.apk", vm.cardFiles.value["thread1"]!!.files!!.single().path)
-                    server.outputStatus = 200
-                    vm.loadThreadFiles("thread1") // Explicit retry is not blocked by the TTL.
-                    await { vm.cardFiles.value["thread1"]?.error == null && vm.cardFiles.value["thread1"]?.loading == false }
-                    vm.loadThreadFiles("thread1", force = true)
-                    server.sessions = """[{"id":"other","spaceId":"project2"}]"""
-                    vm.watch("project2")
-                    await { vm.detail.value?.id == "project2" && vm.threads.value.singleOrNull()?.id == "other" }
-                    delay(250)
-                    assertTrue(vm.cardFiles.value.isEmpty()) // Late old-project output must not leak.
-                } finally { vm.viewModelScope.cancel() }
-            }
-        } finally { Dispatchers.resetMain() }
-    }
-
     @Test fun creationStopUsesAbortAdmissionDeduplicatesPendingAndExposesRetryableFailure() = runBlocking {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         try {
@@ -191,9 +146,30 @@ class CoordinatorLiveTest {
                     assertTrue(vm.threadsLoaded.value)
                     server.fail = false
                     server.sessions = "[]"
-                    dispatcher.scheduler.advanceTimeBy(2001)
+                    dispatcher.scheduler.advanceTimeBy(16_001) // The slow full reload, for a silently dropped stream.
                     await { vm.threads.value.isEmpty() && vm.error.value == null }
                     assertEquals("new", vm.detail.value!!.id)
+                } finally { vm.viewModelScope.cancel() }
+            }
+        } finally { Dispatchers.resetMain() }
+    }
+
+    @Test fun anIdleCoordinatorIsNotPolledOnlyReloadedSlowly() = runBlocking {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            Server().use { server ->
+                server.transcript = """[{"id":"done","role":"assistant","parts":[{"type":"text","text":"All set"}],"metadata":{"usage":{"inputTokens":1}}}]"""
+                val vm = ProjectsViewModel(server.repo)
+                try {
+                    vm.watch("project1")
+                    await { vm.coordinatorMessages.value.singleOrNull()?.hasUsage == true }
+                    val loaded = server.requests.size
+                    repeat(7) { dispatcher.scheduler.advanceTimeBy(2_000) }
+                    delay(100)
+                    assertEquals(loaded, server.requests.size) // A finished reply: no transcript polling.
+                    dispatcher.scheduler.advanceTimeBy(2_001)
+                    await { server.requests.size == loaded + 3 } // The 16s safety reload: space, sessions, transcript.
                 } finally { vm.viewModelScope.cancel() }
             }
         } finally { Dispatchers.resetMain() }

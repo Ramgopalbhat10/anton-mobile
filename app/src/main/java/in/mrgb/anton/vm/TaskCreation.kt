@@ -3,15 +3,17 @@ package `in`.mrgb.anton.vm
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import `in`.mrgb.anton.data.api.ApiError
 import `in`.mrgb.anton.data.api.CreateSessionRequest
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CancellationException
 
-/** A two-phase creation owned by the VM, so closing/recreating the sheet cannot lose a draft. */
+/**
+ * A new task's draft and choices, owned by the VM so closing the sheet can't lose them.
+ * Creating the task and sending its first message are two calls: when the send fails,
+ * the created task is kept so Retry sends to it instead of creating another.
+ */
 class TaskCreation(scope: CoroutineScope? = null) {
     val draft = MessageDraft(scope)
     var projectId by mutableStateOf<String?>(null)
@@ -21,44 +23,7 @@ class TaskCreation(scope: CoroutineScope? = null) {
     private var initialized = false
     var sessionId by mutableStateOf<String?>(null); private set
     var completedId by mutableStateOf<String?>(null); private set
-    var discarding by mutableStateOf(false); private set
-    var discardConfirmation by mutableStateOf(false); private set
-    var discardError by mutableStateOf<String?>(null); private set
-    val choicesLocked get() = draft.sending || discarding || sessionId != null
-    val canDiscard get() = sessionId != null && completedId == null && !draft.sending && !discarding && !draft.attachments.reading
-
-    fun requestDiscard() { if (canDiscard) discardConfirmation = true }
-    fun cancelDiscard() { if (!discarding) discardConfirmation = false }
-
-    /** Delete the abandoned task before releasing its ID. Keep the prompt/files for the new task. */
-    suspend fun discard(delete: suspend (String) -> Unit): Boolean {
-        if (!canDiscard || !discardConfirmation) return false
-        val id = sessionId ?: return false
-        discarding = true
-        draft.attachments.locked = true
-        discardError = null
-        try {
-            try {
-                delete(id)
-            } catch (e: ApiError) {
-                // A previous delete may have succeeded despite a lost response.
-                if (e.status != 404) throw e
-            }
-            sessionId = null
-            discardConfirmation = false
-            draft.clearError()
-            return true
-        } catch (e: CancellationException) {
-            discardError = "Deletion cancelled. Your draft is kept. Try deleting again to finish."
-            throw e
-        } catch (e: Exception) {
-            discardError = "Couldn't delete the task. ${e.message?.takeIf { it.isNotBlank() } ?: "Please try again."} Your draft is kept."
-            return false
-        } finally {
-            draft.attachments.locked = false
-            discarding = false
-        }
-    }
+    val choicesLocked get() = draft.sending || sessionId != null
 
     fun initialize(projectId: String?, model: String?) {
         if (initialized) return
@@ -72,9 +37,7 @@ class TaskCreation(scope: CoroutineScope? = null) {
         create: suspend (CreateSessionRequest) -> SessionDto,
         send: suspend (String, String, OutgoingDraft) -> Unit,
     ) {
-        if (completedId != null || discarding || draft.sending || draft.attachments.reading) return
-        discardConfirmation = false
-        discardError = null
+        if (completedId != null || draft.sending || draft.attachments.reading) return
         val succeeded = draft.deliver { text, outgoing ->
             val id = sessionId ?: run {
                 val named = text.ifBlank {
@@ -83,10 +46,20 @@ class TaskCreation(scope: CoroutineScope? = null) {
                 create(CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = named.take(200),
                     model = model, planMode = planFirst, reasoning = reasoning)).id.also { sessionId = it }
             }
-            // A failed send retains this ID: Retry sends to the same task, not another create.
             send(id, text, outgoing)
         }
         if (succeeded) completedId = sessionId
+    }
+
+    /**
+     * Gives up on the task a failed send created (it stays in the task list) so the
+     * next Start creates a new one, with choices unlocked. The prompt and files are kept.
+     */
+    fun startOver() {
+        if (draft.sending || completedId != null) return
+        sessionId = null
+        draft.uploads.clear() // They were saved to the abandoned task's Library.
+        draft.clearError()
     }
 
     /** Navigation consumes a success once; failures never publish a navigation destination. */
@@ -94,8 +67,6 @@ class TaskCreation(scope: CoroutineScope? = null) {
         val id = completedId ?: return null
         completedId = null
         sessionId = null
-        discardConfirmation = false
-        discardError = null
         initialized = false
         projectId = null
         branch = null

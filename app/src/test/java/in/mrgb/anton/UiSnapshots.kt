@@ -214,15 +214,6 @@ class UiSnapshots {
     fun extensionlessImageViewer() = TaskAttachmentScenes(paparazzi).extensionlessImageViewer()
 
     @Test
-    fun confirmDiscardTask() = TaskAttachmentScenes(paparazzi).confirmDiscardTask()
-
-    @Test
-    fun discardCleanupFailure() = TaskAttachmentScenes(paparazzi).discardCleanupFailure()
-
-    @Test
-    fun newTaskAfterDiscard() = TaskAttachmentScenes(paparazzi).newTaskAfterDiscard()
-
-    @Test
     fun tasksScreen() = snap {
         TasksScreen(
             sessions = tasks, tab = TasksTab.All, query = "",
@@ -260,7 +251,6 @@ class UiSnapshots {
             messages = coordinatorFixture(),
             threads = coordinatorThreads,
             threadsLoaded = true,
-            cardFiles = coordinatorCardFiles,
             onReviewThread = {},
             sending = false, model = "openai/gpt-6.1-terra[fast]", reasoning = null,
             models = models,
@@ -278,16 +268,10 @@ class UiSnapshots {
     fun coordinatorLargeText() = CoordinatorScenes(paparazzi).largeText()
 
     @Test
-    fun coordinatorTailScrolling() = CoordinatorScrollScenes(paparazzi).tallRepliesAndUserPosition()
-
-    @Test
-    fun coordinatorCreationCard() = CoordinatorCreationScenes(paparazzi).persistentCardAndFiles()
+    fun coordinatorCreationCard() = CoordinatorCreationScenes(paparazzi).card()
 
     @Test
     fun coordinatorCreationStates() = CoordinatorCreationScenes(paparazzi).states()
-
-    @Test
-    fun coordinatorReportToggleStability() = CoordinatorToggleScenes(paparazzi).reportDoesNotJump()
 
     @Test
     fun coordinatorReportQuestionAndBody() = CoordinatorScenes(paparazzi).questionAndBody()
@@ -375,7 +359,7 @@ class UiSnapshots {
             branches = listOf("main", "devin/mobile", "anton/feature-flags"),
             defaultBranch = "main",
             models = models, planFirst = true, creating = false,
-            onRepo = {}, onPlanFirst = {}, onStart = {}, onDiscard = {}, onDismiss = {},
+            onRepo = {}, onPlanFirst = {}, onStart = {}, onDismiss = {},
         )
     }
 

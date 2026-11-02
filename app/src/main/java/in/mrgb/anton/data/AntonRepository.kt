@@ -1,15 +1,18 @@
 package `in`.mrgb.anton.data
 
 import `in`.mrgb.anton.data.api.AntonApi
+import `in`.mrgb.anton.data.api.AttachedFileDto
 import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.ConversationDto
 import `in`.mrgb.anton.data.api.EventsStream
 import `in`.mrgb.anton.data.api.OutgoingDraft
+import `in`.mrgb.anton.data.api.PendingUpload
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDetailDto
 import `in`.mrgb.anton.data.api.SpaceDto
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -66,29 +69,40 @@ class AntonRepository(val api: AntonApi, changeEvents: Flow<EventsStream.Event.C
      * (uploads/) first, and the body carries each as an <attachment> block.
      * Images also go inline for vision; their filename is the saved path so
      * the transcript can associate each inline image with its Library chip.
+     * [uploaded] remembers files already saved, so a retry doesn't save them twice.
      */
-    suspend fun send(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) {
-        val attached = coroutineScope {
-            (outgoing.images + outgoing.files).map { async { api.attachToTask(id, it) } }.map { it.await() }
-        }
+    suspend fun send(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft(), uploaded: MutableMap<PendingUpload, AttachedFileDto> = mutableMapOf()) {
+        val attached = upload(outgoing, uploaded) { api.attachToTask(id, it) }
         // Base this on the draft, not the uploaded refs (which now include images).
         val typed = text.trim().ifBlank {
             if (outgoing.files.isEmpty() && outgoing.images.isNotEmpty()) "Look at the attached image." else ""
         }
-        val images = outgoing.images.mapIndexed { i, image -> image.copy(name = attached[i].path) }
-        api.sendMessage(id, Attachments.withAttachments(typed, attached, project = false), images)
+        api.sendMessage(id, Attachments.withAttachments(typed, attached, project = false), namedByPath(outgoing, attached))
     }
 
     /**
      * A message to a project's coordinator: its files go to the project's
      * Library, which the coordinator reads and hands to the threads it starts
      * or messages; its images upload there too (as well as going with the
-     * message as pictures), so a thread can receive them.
+     * message as pictures, named by their saved path like a task's), so a thread can receive them.
      */
-    suspend fun sendCoordinator(spaceId: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) {
-        val attached = coroutineScope { (outgoing.images + outgoing.files).map { async { api.attachToProject(spaceId, it) } }.map { it.await() } }
-        api.sendCoordinator(spaceId, Attachments.withAttachments(text, attached, project = true), outgoing.images)
+    suspend fun sendCoordinator(spaceId: String, text: String, outgoing: OutgoingDraft = OutgoingDraft(), uploaded: MutableMap<PendingUpload, AttachedFileDto> = mutableMapOf()) {
+        val attached = upload(outgoing, uploaded) { api.attachToProject(spaceId, it) }
+        api.sendCoordinator(spaceId, Attachments.withAttachments(text, attached, project = true), namedByPath(outgoing, attached))
     }
+
+    /** Images first, then files — the order [namedByPath] relies on. */
+    private suspend fun upload(
+        outgoing: OutgoingDraft, uploaded: MutableMap<PendingUpload, AttachedFileDto>, attach: suspend (PendingUpload) -> AttachedFileDto,
+    ): List<AttachedFileDto> {
+        val all = outgoing.images + outgoing.files
+        val attached = coroutineScope { all.map { f -> async { uploaded[f] ?: attach(f) } }.awaitAll() }
+        all.zip(attached).forEach { (f, a) -> uploaded[f] = a }
+        return attached
+    }
+
+    private fun namedByPath(outgoing: OutgoingDraft, attached: List<AttachedFileDto>) =
+        outgoing.images.mapIndexed { i, image -> image.copy(name = attached[i].path) }
 
     suspend fun abort(id: String) = api.abortSession(id)
 

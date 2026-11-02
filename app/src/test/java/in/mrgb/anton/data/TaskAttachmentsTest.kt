@@ -153,4 +153,15 @@ class TaskAttachmentsTest {
         assertEquals(1, fixture.uploads.size)
         assertEquals(1, fixture.admissions.size)
     }
+
+    @Test fun retryAfterAdmissionFailureReusesSavedFilesInsteadOfUploadingAgain() = runBlocking {
+        val uploaded = mutableMapOf<PendingUpload, AttachedFileDto>()
+        val draft = OutgoingDraft(images = listOf(image), files = listOf(file))
+        fixture.admissionStatus = 503
+        assertTrue(runCatching { fixture.repo.send("chat-task", "Look", draft, uploaded) }.isFailure)
+        fixture.admissionStatus = 200
+        fixture.repo.send("chat-task", "Look", draft, uploaded)
+        assertEquals(2, fixture.uploads.size)
+        assertEquals(fixture.admissions[0], fixture.admissions[1])
+    }
 }

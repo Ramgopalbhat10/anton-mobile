@@ -148,9 +148,7 @@ private fun App() {
                 messages = vm.coordinatorMessages.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
                 threadsLoaded = vm.threadsLoaded.collectAsState().value,
-                cardFiles = vm.cardFiles.collectAsState().value,
                 cardActions = vm.cardActions.collectAsState().value,
-                onLoadFiles = { vm.loadThreadFiles(it) },
                 onStopThread = { vm.stopCoordinatorThread(it) },
                 onReviewThread = { push(Screen.Thread(it, review = true)) },
                 onOpenThread = { push(Screen.Thread(it)) },
@@ -238,7 +236,6 @@ private fun App() {
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
                 onStart = { vm.start() },
-                onDiscard = { vm.discard() },
                 onDismiss = { newTask = false },
             )
         }
