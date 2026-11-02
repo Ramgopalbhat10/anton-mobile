@@ -275,3 +275,13 @@ data class ThreadReportDto(
     /** The historical question can accompany a separate report body. */
     val asks: String? = null,
 )
+
+/** Complete task Library listing; uploads are filtered by the card, not the API. */
+@Serializable
+data class ThreadOutputDto(val path: String, val size: Long = 0, val mtimeMs: Double = 0.0)
+@Serializable
+data class ThreadOutputsDto(val outputs: List<ThreadOutputDto> = emptyList())
+
+/** Nullable files distinguish not-yet-loaded from a genuinely empty Library. */
+data class ThreadCardFiles(val files: List<ThreadOutputDto>? = null, val loading: Boolean = false, val error: String? = null)
+data class ThreadCardAction(val pending: Boolean = false, val error: String? = null)

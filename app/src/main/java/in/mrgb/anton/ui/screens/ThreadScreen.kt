@@ -66,10 +66,11 @@ fun ThreadScreen(
     onLoadModels: () -> Unit,
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
+    initialShowDiffs: Boolean = false,
 ) {
     val s = bundle?.session
     var menu by remember { mutableStateOf(false) }
-    var showDiffs by remember { mutableStateOf(false) }
+    var showDiffs by remember(initialShowDiffs) { mutableStateOf(initialShowDiffs) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         Row(

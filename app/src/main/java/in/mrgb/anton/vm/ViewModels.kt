@@ -10,6 +10,9 @@ import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -133,6 +136,14 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     private var generation = 0
     private var watching: Job? = null
     private var invalidations: Channel<Unit>? = null
+    val cardFiles = MutableStateFlow<Map<String, ThreadCardFiles>>(emptyMap())
+    val cardActions = MutableStateFlow<Map<String, ThreadCardAction>>(emptyMap())
+    private var cardScope: CoroutineScope? = null
+    private val fileJobs = mutableMapOf<String, Job>()
+    private val fileRequested = mutableSetOf<String>()
+    private val fileDirty = mutableSetOf<String>()
+    private val fileLastLoad = mutableMapOf<String, Long>()
+    private val filePermits = Semaphore(4)
 
     init { refresh() }
 
@@ -164,6 +175,10 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     fun watch(id: String): Job {
         watching?.cancel()
         val token = ++generation
+        fileJobs.clear()
+        fileLastLoad.clear()
+        fileDirty.clear()
+        cardActions.value = emptyMap()
         if (activeSpace != id) {
             activeSpace = id
             _detail.value = null
@@ -172,15 +187,20 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             coordinatorMessages.value = emptyList()
             coordinatorModel.value = null
             coordinatorReasoning.value = null
+            cardFiles.value = emptyMap()
+            cardActions.value = emptyMap()
+            fileRequested.clear()
         }
         return viewModelScope.launch {
             loadModels()
             coroutineScope {
                 val signals = Channel<Unit>(Channel.CONFLATED)
+                cardScope = this
                 invalidations = signals
                 signals.trySend(Unit)
                 launch {
                     repo.changes.collect { e ->
+                        if (e.name == "task" && e.id in fileRequested && e.what in setOf("files", "state")) loadThreadFiles(e.id!!, force = true)
                         if (e.name == "sessions" || e.name == "spaces" ||
                             (e.name == "space" && (e.id == null || e.id == id)) ||
                             (e.name == "task" && (e.id == null || _threads.value.any { it.id == e.id }))) signals.trySend(Unit)
@@ -193,7 +213,11 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
                     for (ignored in signals) loadProject(id, token)
                 } finally {
                     signals.close()
-                    if (generation == token) invalidations = null
+                    if (generation == token) {
+                        invalidations = null
+                        cardScope = null
+                        cardFiles.update { map -> map.mapValues { it.value.copy(loading = false) } }
+                    }
                 }
             }
         }.also { watching = it }
@@ -215,6 +239,56 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
         read({ repo.sessions() }) { _threads.value = it.filter { row -> row.spaceId == id }; threadsLoaded.value = true }
         read({ repo.api.spaceMessages(id) }) { coordinatorMessages.value = it }
         if (!failed && generation == token) error.value = null
+        if (generation == token) fileRequested.toList().forEach { loadThreadFiles(it) }
+    }
+
+    /** Only cards actually encountered in the feed request their Library; duplicate cards share it. */
+    fun loadThreadFiles(threadId: String, force: Boolean = false): Job? {
+        val scope = cardScope ?: return null
+        if (_threads.value.none { it.id == threadId }) return null
+        fileRequested += threadId
+        if (fileJobs[threadId]?.isActive == true) {
+            if (force) fileDirty += threadId
+            return fileJobs[threadId]
+        }
+        val now = System.currentTimeMillis()
+        if (!force && cardFiles.value[threadId]?.error == null && now - (fileLastLoad[threadId] ?: 0) < 30_000) return null
+        val token = generation
+        fileLastLoad[threadId] = now
+        cardFiles.update { it + (threadId to (it[threadId] ?: ThreadCardFiles()).copy(loading = true, error = null)) }
+        return scope.launch {
+            try {
+                val files = filePermits.withPermit { repo.api.threadOutputs(threadId) }
+                coroutineContext.ensureActive()
+                if (generation == token) cardFiles.update { it + (threadId to ThreadCardFiles(files)) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (generation == token) cardFiles.update { it + (threadId to (it[threadId] ?: ThreadCardFiles()).copy(loading = false, error = "Couldn't load files")) }
+            } finally {
+                if (generation == token) {
+                    fileJobs.remove(threadId)
+                    if (fileDirty.remove(threadId)) loadThreadFiles(threadId, force = true)
+                }
+            }
+        }.also { fileJobs[threadId] = it }
+    }
+
+    fun stopCoordinatorThread(threadId: String) = viewModelScope.launch {
+        val thread = _threads.value.firstOrNull { it.id == threadId } ?: return@launch
+        if (thread.threadState != "working" && !thread.working) return@launch
+        if (cardActions.value[threadId]?.pending == true) return@launch
+        val token = generation
+        cardActions.update { it + (threadId to ThreadCardAction(pending = true)) }
+        try {
+            repo.abort(threadId)
+            if (generation == token) invalidations?.trySend(Unit)
+            if (generation == token) cardActions.update { it + (threadId to ThreadCardAction()) }
+        } catch (e: CancellationException) {
+            if (generation == token) cardActions.update { it - threadId }
+            throw e
+        } catch (e: Exception) {
+            if (generation == token) cardActions.update { it + (threadId to ThreadCardAction(error = "Couldn't stop replying. Try again.")) }
+        }
     }
 
     fun refreshCoordinator(id: String) = viewModelScope.launch {

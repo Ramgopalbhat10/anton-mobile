@@ -40,6 +40,7 @@ internal data class CoordinatorEntry(
     val threadId: String?,
     val creation: Boolean,
     val asks: String? = null,
+    val session: SessionDto? = null,
 )
 
 internal fun resolveThread(threads: List<SessionDto>, id: String): SessionDto? =
@@ -77,7 +78,7 @@ private fun liveEntry(s: SessionDto, origin: String): CoordinatorEntry {
     }
     val pr = s.prUrl?.substringAfterLast('/')?.takeIf { it.all(Char::isDigit) && it.isNotEmpty() }
     val metadata = listOfNotNull(origin, s.repo.takeIf { it.isNotBlank() && it != "Chat" }, pr?.let { "PR #$it · ${s.pullRequest?.state ?: "open"}" }, s.pullRequest?.checks?.let { "Checks $it" }).joinToString(" · ")
-    return CoordinatorEntry(s.title.ifBlank { "Thread" }, glyph.label, glyph, text, metadata, s.id, true)
+    return CoordinatorEntry(s.title.ifBlank { "Thread" }, glyph.label, glyph, text, metadata, s.id, true, session = s)
 }
 
 internal fun reportEntry(report: ThreadReportDto, threads: List<SessionDto>, loaded: Boolean): CoordinatorEntry? {
@@ -109,14 +110,23 @@ internal fun compactPreview(text: String): String {
 
 @Composable
 internal fun CoordinatorThreadEntry(entry: CoordinatorEntry, onOpen: (String) -> Unit) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    CoordinatorEntryView(entry, expanded, { expanded = !expanded }, onOpen)
+    if (entry.creation) {
+        CoordinatorCreationCard(entry, onOpen)
+    } else {
+        var expanded by rememberSaveable { mutableStateOf(false) }
+        CoordinatorEntryView(entry, expanded, { expanded = !expanded }, onOpen)
+    }
 }
 
 /** Separate toggle and preview controls: first tap expands, second opens the actual thread. */
 @Composable
 internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, onToggle: () -> Unit, onOpen: (String) -> Unit) {
-    val shape = RoundedCornerShape(if (entry.creation) 12.dp else 8.dp)
+    if (entry.creation) {
+        CoordinatorCreationCard(entry, onOpen)
+        return
+    }
+    val beforeToggle = LocalCoordinatorReportToggle.current
+    val shape = RoundedCornerShape(8.dp)
     val headerInteractions = remember { MutableInteractionSource() }
     val previewInteractions = remember { MutableInteractionSource() }
     val headerFocused by headerInteractions.collectIsFocusedAsState()
@@ -131,7 +141,7 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
             Modifier.fillMaxWidth().clip(shape)
                 .background(if (entry.creation) Anton.CardBg else Anton.WellBg)
                 .border(if (headerFocused) 2.dp else 1.dp, if (headerFocused) Anton.Accent else if (entry.creation) Anton.CardBorder else Anton.BorderSubtle, shape)
-                .clickable(interactionSource = headerInteractions, indication = LocalIndication.current, role = Role.Button, onClickLabel = if (expanded) "Collapse preview" else "Expand preview", onClick = onToggle)
+                .clickable(interactionSource = headerInteractions, indication = LocalIndication.current, role = Role.Button, onClickLabel = if (expanded) "Collapse preview" else "Expand preview", onClick = { beforeToggle(); onToggle() })
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                 .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.SessionDto
+import `in`.mrgb.anton.data.api.ThreadCardFiles
+import `in`.mrgb.anton.data.api.ThreadCardAction
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
@@ -37,11 +39,17 @@ fun CoordinatorScreen(
     threads: List<SessionDto> = emptyList(),
     threadsLoaded: Boolean = false,
     onOpenThread: (String) -> Unit = {},
+    cardFiles: Map<String, ThreadCardFiles> = emptyMap(),
+    cardActions: Map<String, ThreadCardAction> = emptyMap(),
+    onLoadFiles: (String) -> Unit = {},
+    onStopThread: ((String) -> Unit)? = null,
+    onReviewThread: ((String) -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId)) {
+            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId),
+                LocalCoordinatorCards provides CoordinatorCardHost(cardFiles, cardActions, onLoadFiles, onStopThread, onReviewThread)) {
             key(spaceId) { CoordinatorTimeline(messages, threads, threadsLoaded, onOpenThread) }
             }
         }
@@ -75,7 +83,9 @@ internal fun CoordinatorTimeline(
     listState: LazyListState = rememberLazyListState(),
     tailFollow: CoordinatorTailFollow = remember { CoordinatorTailFollow() },
 ) {
-    FollowCoordinatorTail(listState, tailFollow)
+    val cards = LocalCoordinatorCards.current
+    FollowCoordinatorTail(listState, tailFollow, Triple(messages, threads, cards.files))
+    CompositionLocalProvider(LocalCoordinatorReportToggle provides tailFollow::pauseForToggle) {
     LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
         if (messages.isEmpty()) {
             item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
@@ -85,5 +95,6 @@ internal fun CoordinatorTimeline(
         }
         // Target the end, including a tall final message and trailing content padding.
         item(key = "coordinator-tail-anchor") { Spacer(Modifier.height(0.dp)) }
+    }
     }
 }

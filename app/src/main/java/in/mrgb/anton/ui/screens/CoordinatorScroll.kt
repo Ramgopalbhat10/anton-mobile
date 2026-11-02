@@ -5,6 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -15,9 +18,22 @@ internal class CoordinatorTailFollow {
     var following = true
         private set
     private var userScrolling = false
+    private var revision: Any? = Unit
+    private var pausedForToggle = false
+    val shouldFollow: Boolean get() = following && !pausedForToggle
+
+    /** A local disclosure must not move its own tap target. Only fresh content resumes follow. */
+    fun pauseForToggle() { pausedForToggle = true }
 
     fun observe(position: CoordinatorTailPosition) {
-        if (position.scrolling || userScrolling) following = position.atEnd
+        if (position.contentRevision != revision) {
+            revision = position.contentRevision
+            pausedForToggle = false
+        }
+        if (position.scrolling || userScrolling) {
+            following = position.atEnd
+            if (position.atEnd) pausedForToggle = false
+        }
         userScrolling = position.scrolling
     }
 }
@@ -30,6 +46,7 @@ internal data class CoordinatorTailPosition(
     val lastOffset: Int = 0,
     val lastSize: Int = 0,
     val viewportEnd: Int = 0,
+    val contentRevision: Any? = Unit,
 )
 
 /**
@@ -44,7 +61,7 @@ internal suspend fun followCoordinatorTail(
 ) {
     positions.collect { position ->
         intent.observe(position)
-        if (intent.following && !position.scrolling && !position.atEnd && position.itemCount > 0) {
+        if (intent.shouldFollow && !position.scrolling && !position.atEnd && position.itemCount > 0) {
             try {
                 // The final item is a zero-height end anchor, NOT the start of the last message.
                 scrollToItem(position.itemCount - 1)
@@ -57,11 +74,15 @@ internal suspend fun followCoordinatorTail(
     }
 }
 
+internal val LocalCoordinatorReportToggle = staticCompositionLocalOf<() -> Unit> { {} }
+
 @Composable
 internal fun FollowCoordinatorTail(
     listState: LazyListState,
     intent: CoordinatorTailFollow = remember { CoordinatorTailFollow() },
+    contentRevision: Any? = Unit,
 ) {
+    val revision by rememberUpdatedState(contentRevision)
     LaunchedEffect(listState, intent) {
         followCoordinatorTail(
             snapshotFlow {
@@ -69,7 +90,7 @@ internal fun FollowCoordinatorTail(
                 val last = layout.visibleItemsInfo.lastOrNull()
                 CoordinatorTailPosition(
                     listState.isScrollInProgress, !listState.canScrollForward, layout.totalItemsCount,
-                    last?.index ?: -1, last?.offset ?: 0, last?.size ?: 0, layout.viewportEndOffset,
+                    last?.index ?: -1, last?.offset ?: 0, last?.size ?: 0, layout.viewportEndOffset, revision,
                 )
             },
             intent,
