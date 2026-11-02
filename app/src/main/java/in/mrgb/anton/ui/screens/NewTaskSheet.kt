@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.data.api.ModelDto
+import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
@@ -46,7 +47,7 @@ fun NewTaskSheet(
     creating: Boolean,
     onRepo: (String?) -> Unit,
     onPlanFirst: (Boolean) -> Unit,
-    onStart: (projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?) -> Unit,
+    onStart: (projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?, draft: OutgoingDraft) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var repo by remember { mutableStateOf(repos.firstOrNull()?.first) }
@@ -55,17 +56,22 @@ fun NewTaskSheet(
     var model by remember { mutableStateOf(models.firstOrNull { it.variant == null }?.id) }
     var reasoning by remember { mutableStateOf<String?>(null) }
     var modelMenu by remember { mutableStateOf(false) }
+    var addMenu by remember { mutableStateOf(false) }
+    val atts = rememberDraftAttachments()
+    val picker = rememberComposerPicker { uris -> atts.attach(uris) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "prompt")
-    val canStart = prompt.isNotBlank() && !creating
+    val blind = atts.images.isNotEmpty() && Catalog.find(models, model.orEmpty())?.vision == false
+    val canStart = (prompt.isNotBlank() || atts.count > 0) && !creating && !blind
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 16.dp)) {
         val shape = RoundedCornerShape(14.dp)
         Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
+            AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
             BasicTextField(
                 value = prompt, onValueChange = { prompt = it },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 80.dp).focusRequester(focus),
@@ -78,10 +84,24 @@ fun NewTaskSheet(
                     inner()
                 },
             )
+            if (atts.notice != null || blind) {
+                Text(
+                    if (blind) "The picked model cannot see images. Pick a model marked Vision to send them." else atts.notice.orEmpty(),
+                    style = Type.Small, color = Anton.WarningText,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 6.dp),
+                )
+            }
             Row(
                 Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Box {
+                    GhostIconButton(Lucide.Plus, "Attach files", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp) { addMenu = true }
+                    AntonDropdown(expanded = addMenu, onDismiss = { addMenu = false }, minWidth = 200.dp) {
+                        MenuItem("Photo or screenshot", icon = Lucide.Image, onClick = { addMenu = false; picker.images() })
+                        MenuItem("File", icon = Lucide.File, onClick = { addMenu = false; picker.files() })
+                    }
+                }
                 // Chips keep their full labels and the row scrolls sideways when they don't fit.
                 Row(
                     Modifier.weight(1f).horizontalScroll(rememberScrollState()),
@@ -134,7 +154,7 @@ fun NewTaskSheet(
                 Box(
                     Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
                         .background(if (canStart) Anton.Accent else Anton.N750)
-                        .clickable(enabled = canStart, role = Role.Button) { onStart(repo, branch, prompt, model, reasoning) },
+                        .clickable(enabled = canStart, role = Role.Button) { onStart(repo, branch, prompt, model, reasoning, atts.take()) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

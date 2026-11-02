@@ -1,12 +1,16 @@
 package `in`.mrgb.anton.data
 
 import `in`.mrgb.anton.data.api.AntonApi
+import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.EventsStream
 import `in`.mrgb.anton.data.api.MessageDto
+import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDetailDto
 import `in`.mrgb.anton.data.api.SpaceDto
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -41,7 +45,30 @@ class AntonRepository(val api: AntonApi) {
 
     suspend fun space(id: String): SpaceDetailDto = api.space(id)
 
-    suspend fun send(id: String, text: String) = api.sendMessage(id, text)
+    /**
+     * A message to a task's agent: its files upload to the task's Library
+     * (uploads/) first, and the body carries each as an <attachment> block —
+     * the same flow as the web's thread composer.
+     */
+    suspend fun send(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) {
+        val attached = coroutineScope { outgoing.files.map { async { api.attachToTask(id, it) } }.map { it.await() } }
+        // A message of only pictures still needs words (the web's IMAGE_ONLY).
+        val typed = text.trim().ifBlank {
+            if (attached.isEmpty() && outgoing.images.isNotEmpty()) "Look at the attached image." else ""
+        }
+        api.sendMessage(id, Attachments.withAttachments(typed, attached, project = false), outgoing.images)
+    }
+
+    /**
+     * A message to a project's coordinator: its files go to the project's
+     * Library, which the coordinator reads and hands to the threads it starts
+     * or messages; its images upload there too (as well as going with the
+     * message as pictures), so a thread can receive them.
+     */
+    suspend fun sendCoordinator(spaceId: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) {
+        val attached = coroutineScope { (outgoing.images + outgoing.files).map { async { api.attachToProject(spaceId, it) } }.map { it.await() } }
+        api.sendCoordinator(spaceId, Attachments.withAttachments(text, attached, project = true), outgoing.images)
+    }
 
     suspend fun abort(id: String) = api.abortSession(id)
 

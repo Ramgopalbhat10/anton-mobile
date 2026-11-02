@@ -143,7 +143,7 @@ private fun App() {
                 models = vm.models.collectAsState().value,
                 onModel = { model, level -> vm.setCoordinatorModel(s.id, model, level) },
                 onLoadModels = vm::loadModels,
-                onSend = { vm.sendCoordinator(s.id, it) },
+                onSend = { text, draft -> vm.sendCoordinator(s.id, text, draft) },
                 onBack = { back.removeAt(back.lastIndex) },
             )
         }
@@ -206,8 +206,8 @@ private fun App() {
                 creating = vm.creating.collectAsState().value,
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
-                onStart = { pid, branch, prompt, model, reasoning ->
-                    vm.start(pid, branch, prompt, model, reasoning) { id ->
+                onStart = { pid, branch, prompt, model, reasoning, draft ->
+                    vm.start(pid, branch, prompt, model, reasoning, draft) { id ->
                         newTask = false
                         if (id != null) push(Screen.Thread(id))
                     }

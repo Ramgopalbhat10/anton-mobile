@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Type
@@ -587,6 +588,11 @@ fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifie
  * top and a compact footer row (add + attach + model on the left, send/stop
  * on the right). Used by the thread and coordinator views so both are identical.
  * Focus lights the card's border like shadcn's InputGroup.
+ *
+ * The + and paperclip attach files like the web's composer: seeable images
+ * join the draft as images (sent with the message), every other file as a
+ * file (uploaded on send and named in the body). [seesImages] is false when
+ * the picked model takes no pictures — sending them is then blocked, as the web does.
  */
 @Composable
 fun AntonComposer(
@@ -594,24 +600,30 @@ fun AntonComposer(
     working: Boolean,
     sending: Boolean,
     model: String,
-    onSend: (String) -> Unit,
+    onSend: (String, OutgoingDraft) -> Unit,
     onStop: () -> Unit,
     onOpenModel: () -> Unit,
+    seesImages: Boolean = true,
     modelPicker: @Composable (dismiss: () -> Unit) -> Unit = {},
     modelIcon: (@Composable () -> Unit)? = null,
     modelFacts: (@Composable () -> Unit)? = null,
+    atts: DraftAttachments = rememberDraftAttachments(),
 ) {
     var text by remember { mutableStateOf("") }
     var modelMenu by remember { mutableStateOf(false) }
+    var addMenu by remember { mutableStateOf(false) }
+    val picker = rememberComposerPicker { uris -> atts.attach(uris) }
     val focusManager = LocalFocusManager.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "composer")
     val shape = RoundedCornerShape(14.dp)
-    val canSend = text.isNotBlank() && !sending
+    val blind = atts.images.isNotEmpty() && !seesImages
+    val canSend = (text.isNotBlank() || atts.count > 0) && !sending && !blind
     Column(
         Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape),
     ) {
+        AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
         BasicTextField(
             value = text, onValueChange = { text = it },
             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
@@ -624,13 +636,26 @@ fun AntonComposer(
                 inner()
             },
         )
+        if (atts.notice != null || blind) {
+            Text(
+                if (blind) "${model.ifBlank { "This model" }} cannot see images. Pick a model marked Vision to send them." else atts.notice.orEmpty(),
+                style = Type.Small, color = Anton.WarningText,
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 6.dp),
+            )
+        }
         Row(
             Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp)
-                GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp)
+                Box {
+                    GhostIconButton(Lucide.Plus, "Add", tint = Anton.IconTertiary, size = 30.dp, iconSize = 16.dp) { addMenu = true }
+                    AntonDropdown(expanded = addMenu, onDismiss = { addMenu = false }, minWidth = 200.dp) {
+                        MenuItem("Photo or screenshot", icon = Lucide.Image, onClick = { addMenu = false; picker.images() })
+                        MenuItem("File", icon = Lucide.File, onClick = { addMenu = false; picker.files() })
+                    }
+                }
+                GhostIconButton(Lucide.Paperclip, "Attach", tint = Anton.IconTertiary, size = 30.dp, iconSize = 15.dp) { picker.files() }
                 if (model.isNotBlank()) {
                     Spacer(Modifier.width(4.dp))
                     Box(Modifier.weight(1f, fill = false)) {
@@ -653,7 +678,7 @@ fun AntonComposer(
                     .background(bg)
                     .border(1.dp, if (working) Anton.DangerBorder else Color.Transparent, RoundedCornerShape(8.dp))
                     .clickable(sendInteraction, indication = null, role = Role.Button) {
-                        if (working) onStop() else if (canSend) { onSend(text); text = ""; focusManager.clearFocus() }
+                        if (working) onStop() else if (canSend) { onSend(text, atts.take()); text = ""; focusManager.clearFocus() }
                     },
                 contentAlignment = Alignment.Center,
             ) {

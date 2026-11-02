@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
@@ -111,7 +112,7 @@ private val models = listOf(
 )
 
 private val threadMessages = listOf(
-    MessageDto("u1", "user", parts = listOf(PartDto(type = "text", text = "Can you build these diagrams in pure SVG? The screenshot is a reference from cloudflare blog."))),
+    MessageDto("u1", "user", parts = listOf(PartDto(type = "text", text = "Can you build these diagrams in pure SVG? The screenshot is a reference from cloudflare blog.\n\n<attachment name=\"cloudflare-screenshot.png\" path=\"uploads/cloudflare-screenshot.png\" kind=\"PNG\" size=\"42137\">\n…image…\n</attachment>\n\n<attachment name=\"brand-guide.pdf\" path=\"uploads/brand-guide.pdf\" kind=\"PDF\" size=\"1400321\">\n…text…\n</attachment>"))),
     MessageDto(
         "a1", "assistant", parts = listOf(
             PartDto(type = "reasoning", text = "The user wants a Cloudflare-blog-style diagram in pure SVG, no raster images. I'll hand-write the SVG with their palette."),
@@ -188,6 +189,11 @@ class UiSnapshots {
         Box(Modifier.fillMaxSize().background(Anton.Canvas)) { content() }
     }
 
+    private fun fakeImage(rgb: Long) =
+        android.graphics.Bitmap.createBitmap(120, 80, android.graphics.Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(rgb.toInt()) }
+            .asImageBitmap()
+
     @Test
     fun tasksScreen() = snap {
         TasksScreen(
@@ -226,7 +232,7 @@ class UiSnapshots {
             messages = threadMessages,
             sending = false, model = "openai/gpt-6.1-terra[fast]", reasoning = null,
             models = models,
-            onModel = { _, _ -> }, onLoadModels = {}, onSend = {}, onBack = {},
+            onModel = { _, _ -> }, onLoadModels = {}, onSend = { _, _ -> }, onBack = {},
         )
     }
 
@@ -238,7 +244,7 @@ class UiSnapshots {
             diffs = diffFiles,
             models = models, reasoning = null, sending = false,
             webUrl = "https://code.mrgb.in",
-            onBack = {}, onSend = {}, onAbort = {}, onStop = {},
+            onBack = {}, onSend = { _, _ -> }, onAbort = {}, onStop = {},
             onModel = { _, _ -> }, onLoadModels = {},
         )
     }
@@ -279,7 +285,7 @@ class UiSnapshots {
             branches = listOf("main", "devin/mobile", "anton/feature-flags"),
             defaultBranch = "main",
             models = models, planFirst = true, creating = false,
-            onRepo = {}, onPlanFirst = {}, onStart = { _, _, _, _, _ -> }, onDismiss = {},
+            onRepo = {}, onPlanFirst = {}, onStart = { _, _, _, _, _, _ -> }, onDismiss = {},
         )
     }
 
@@ -298,11 +304,34 @@ class UiSnapshots {
                     placeholder = "Tell the coordinator what mrgb needs",
                     working = false, sending = false,
                     model = "openai/gpt-6.1-terra[fast]",
-                    onSend = {}, onStop = {}, onOpenModel = {},
+                    onSend = { _, _ -> }, onStop = {}, onOpenModel = {},
                 )
             }
             SectionLabel("RECENT", count = 58, modifier = Modifier.padding(top = 12.dp))
             Badge("open", Tone.Success, mono = true)
+        }
+    }
+
+    @Test
+    fun composerAttachments() = snap {
+        val resolver = androidx.compose.ui.platform.LocalContext.current.applicationContext.contentResolver
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val atts = androidx.compose.runtime.remember {
+            `in`.mrgb.anton.ui.components.DraftAttachments(resolver, scope).apply {
+                images += `in`.mrgb.anton.ui.components.DraftImage(`in`.mrgb.anton.data.api.PendingUpload("screenshot-figma.png", "image/png", ByteArray(42_000)), fakeImage(0xff35507e))
+                images += `in`.mrgb.anton.ui.components.DraftImage(`in`.mrgb.anton.data.api.PendingUpload("photo-site.png", "image/png", ByteArray(18_000)), fakeImage(0xff7a3b6e))
+                files += `in`.mrgb.anton.data.api.PendingUpload("brand-guide.pdf", "application/pdf", ByteArray(1_400_000))
+                files += `in`.mrgb.anton.data.api.PendingUpload("schema-notes.txt", "text/plain", ByteArray(3_100))
+            }
+        }
+        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Bottom) {
+            AntonComposer(
+                placeholder = "Reply to Anton",
+                working = false, sending = false,
+                model = "openai/gpt-6.1-terra[fast]",
+                onSend = { _, _ -> }, onStop = {}, onOpenModel = {},
+                atts = atts,
+            )
         }
     }
 

@@ -157,7 +157,10 @@ fun JsonElement?.outputText(): String = when (this) {
 
 /**
  * Files attached to a message, the `<attachment>` blocks src/core/attachments.ts
- * writes after the typed text. The app shows them as chips, like the web.
+ * writes after the typed text. The app shows them as chips, like the web, and
+ * writes the same blocks for messages it sends (a task's files land in its
+ * Library under uploads/, a coordinator's in the project's Library, which the
+ * coordinator then hands to the threads it starts or messages).
  */
 object Attachments {
     data class Ref(val name: String, val path: String, val kind: String, val size: Long, val project: Boolean) {
@@ -168,6 +171,30 @@ object Attachments {
 
     private val OPEN = Regex("<attachment name=\"([^\"]*)\" path=\"([^\"]*)\" kind=\"([^\"]*)\" size=\"(\\d+)\"( library=\"project\")?>\\n?")
     private const val CLOSE = "</attachment>"
+
+    private fun attr(v: String) = v.replace(Regex("[\"<>\n]"), "_")
+
+    private fun count(n: Long) = String.format(java.util.Locale.US, "%,d", n)
+
+    /** The block one uploaded file adds to a message body — the web's attachmentBlock. */
+    fun block(f: AttachedFileDto, project: Boolean): String {
+        val head = "<attachment name=\"${attr(f.name)}\" path=\"${attr(f.path)}\" kind=\"${attr(f.kind)}\" size=\"${f.size}\"${if (project) " library=\"project\"" else ""}>"
+        val read = if (project) "read_project_file" else "read_attachment"
+        val body = f.text?.let { text ->
+            text.replace(CLOSE, "<\\/attachment>") +
+                (f.cut?.let { cut -> "\n[Cut at ${count(text.length.toLong())} of ${count(cut)} characters: read the rest with $read from offset ${text.length}.]" } ?: "")
+        } ?: if (f.kind.endsWith(" image")) "An image: given with this message as a picture, or described after it for a model that cannot see."
+            else "Not read as text (an archive or a format Anton does not convert): open the original at its path."
+        return "$head\n$body\n$CLOSE"
+    }
+
+    /** What a message only of files says, since the agent always gets text. */
+    fun only(count: Int) = if (count == 1) "Look at the attached file." else "Look at the attached files."
+
+    /** The typed text with each file's block after it — the web's withAttachments. */
+    fun withAttachments(text: String, files: List<AttachedFileDto>, project: Boolean): String =
+        if (files.isEmpty()) text
+        else (listOf(text.trim().ifEmpty { only(files.size) }) + files.map { block(it, project) }).joinToString("\n\n")
 
     fun split(message: String): Split {
         val files = mutableListOf<Ref>()
