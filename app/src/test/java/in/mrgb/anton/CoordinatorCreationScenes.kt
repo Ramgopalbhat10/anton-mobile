@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.*
@@ -34,10 +35,12 @@ internal class CoordinatorCreationScenes(private val paparazzi: Paparazzi) {
         var opened: String? = null
         var reviewed: String? = null
         var viewed: Pair<List<Artifact>, Int>? = null
+        var density = 1f
         val host = CoordinatorCardHost(coordinatorCardFiles, review = { reviewed = it })
         val view = ComposeView(paparazzi.context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
+                density = LocalDensity.current.density
                 CompositionLocalProvider(LocalCoordinatorCards provides host, LocalViewer provides { items, index -> viewed = items to index }) {
                     Column(Modifier.fillMaxSize().background(Anton.Canvas).padding(16.dp)) {
                         if (ui.showFiles) {
@@ -60,6 +63,11 @@ internal class CoordinatorCreationScenes(private val paparazzi: Paparazzi) {
         try {
             paparazzi.snapshot(view, name = "card")
             assertTrue("Creation is not an expander", all().none { it.config.getOrNull(SemanticsProperties.StateDescription) != null })
+            for (text in listOf("Review changes", "View thread", "PR", "anton-mobile-final.apk", "+1")) {
+                val heightDp = button(text).boundsInRoot.height / density
+                assertTrue("$text must stay visually compact ($heightDp dp)", heightDp in 25.5f..30f)
+                assertEquals(Role.Button, button(text).config[SemanticsProperties.Role])
+            }
             assertTrue(button("Review changes").config[SemanticsActions.OnClick].action!!.invoke())
             assertEquals(s.id, reviewed)
             assertNull(opened) // An inner action does not navigate through the card's parent action.
@@ -71,6 +79,7 @@ internal class CoordinatorCreationScenes(private val paparazzi: Paparazzi) {
             assertTrue(ui.showFiles)
             view.disposeComposition()
             paparazzi.snapshot(view, name = "moreFiles")
+            assertTrue("Separate file-picker rows keep their larger targets", button("test-report.md").boundsInRoot.height / density >= 39.5f)
             assertTrue(button("test-report.md").config[SemanticsActions.OnClick].action!!.invoke())
             assertEquals("test-report.md", viewed!!.first[viewed!!.second].name)
             assertFalse(ui.showFiles)

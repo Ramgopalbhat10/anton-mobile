@@ -121,7 +121,7 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
             .border(if (focused) 2.dp else 1.dp, if (focused) Anton.Accent else Anton.CardBorder, shape)
             .then(if (id != null) Modifier.clickable(interactions, LocalIndication.current, role = Role.Button, onClickLabel = "Open thread", onClick = { onOpen(id) }) else Modifier)
             .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             StateGlyph(entry.glyph)
@@ -133,7 +133,7 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
                 else -> Anton.TextSecondary
             }, modifier = Modifier.widthIn(max = 100.dp))
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             s?.prUrl?.takeIf { it.isNotBlank() }?.let { url ->
                 val number = Regex("/pull/(\\d+)").find(url)?.groupValues?.get(1)
                 val state = s.pullRequest?.state?.replaceFirstChar { it.uppercase() } ?: "PR"
@@ -169,7 +169,7 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
                 Markdown(compactPreview(entry.preview), modifier = Modifier.fillMaxWidth(), colors = mdColors(if (entry.glyph == GlyphKind.Waiting) Anton.WarningText else Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
             }
         }
-        if (id != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (id != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val actions = s?.let(::creationActions) ?: listOf(CreationAction.View)
             actions.forEach { next ->
                 when (next) {
@@ -193,23 +193,25 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
 internal fun CoordinatorFilesList(artifacts: List<Artifact>, enabled: Boolean = true, onSelect: (Int) -> Unit) {
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         itemsIndexed(artifacts, key = { _, file -> file.url }) { index, file ->
-            CardControl(file.name, Lucide.FileText, enabled = enabled) { onSelect(index) }
+            CardControl(file.name, Lucide.FileText, enabled = enabled, compact = false) { onSelect(index) }
         }
     }
 }
 
-/** Touch-sized independent control, with a visible keyboard-focus border and no height animation. */
+/** Compact visual chip with native clickable hit expansion and a visible keyboard-focus border.
+ * File-picker rows retain their larger layout; large text may grow either control naturally.
+ */
 @Composable
-private fun CardControl(text: String, icon: ImageVector, color: Color = Anton.TextSecondary, label: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
+private fun CardControl(text: String, icon: ImageVector, color: Color = Anton.TextSecondary, label: String? = null, enabled: Boolean = true, compact: Boolean = true, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(7.dp)
-    Row(Modifier.widthIn(max = 240.dp).heightIn(min = 40.dp).clip(shape).background(Anton.Hover)
+    val shape = RoundedCornerShape(if (compact) 6.dp else 7.dp)
+    Row(Modifier.widthIn(max = 240.dp).heightIn(min = if (compact) 26.dp else 40.dp).clip(shape).background(Anton.Hover)
         .border(if (focused) 2.dp else 1.dp, if (focused) Anton.Accent else Anton.BorderDefault, shape)
         .clickable(source, LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
         .then(if (label != null) Modifier.semantics { contentDescription = "$text, $label" } else Modifier)
-        .padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Icon(icon, null, tint = if (enabled) color else Anton.TextSecondary, modifier = Modifier.size(14.dp))
+        .padding(horizontal = if (compact) 7.dp else 9.dp, vertical = if (compact) 3.dp else 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 5.dp)) {
+        Icon(icon, null, tint = if (enabled) color else Anton.TextSecondary, modifier = Modifier.size(if (compact) 12.dp else 14.dp))
         Text(text, style = Type.Meta, color = if (enabled) color else Anton.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
