@@ -135,6 +135,23 @@ data class AskOptionDto(val label: String = "", val hint: String? = null)
 @Serializable
 data class MessagesResponse(val messages: List<MessageDto> = emptyList())
 
+/** A file the server saved for a message (POST …/attachments): where it landed and its text, cut at INLINE_CHARS. */
+@Serializable
+data class AttachedFileDto(
+    val name: String,
+    val path: String,
+    val size: Long = 0,
+    val kind: String = "File",
+    val text: String? = null,
+    val cut: Long? = null,
+)
+
+/** A file picked in a composer, kept until the message sends (the web's FileAttachment/ImageAttachment). */
+data class PendingUpload(val name: String, val mime: String, val bytes: ByteArray)
+
+/** What a composer hands to a send: images the model sees, and files to upload first and name in the body. */
+data class OutgoingDraft(val images: List<PendingUpload> = emptyList(), val files: List<PendingUpload> = emptyList())
+
 @Serializable
 data class SpaceDto(
     val id: String,

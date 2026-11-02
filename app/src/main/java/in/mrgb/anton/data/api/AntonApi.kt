@@ -4,15 +4,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.putJsonArray
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** Static config the api client reads on every call — Settings edits take effect immediately. */
@@ -163,20 +163,34 @@ class AntonApi(private val config: () -> ServerConfig) {
             http.newCall(req).execute().use { if (!it.isSuccessful) throw ApiError(it.code, it.body?.string().orEmpty()) }
         }
 
-    /** Message the project's coordinator — the flue admission body, same as a task prompt. */
-    suspend fun sendCoordinator(spaceId: String, text: String) = post<JsonObject>(
-        "/api/agents/coordinator/$spaceId",
-        """{"kind":"user","body":${json.encodeToString(kotlinx.serialization.serializer(), text)}}""",
-    )
+    /**
+     * The flue admission body: {kind:'user', body, attachments?} — images the
+     * model sees go inline as base64, as the web's sendMessage delivers them.
+     */
+    private fun admissionBody(text: String, images: List<PendingUpload>): String =
+        kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive("user"))
+            put("body", kotlinx.serialization.json.JsonPrimitive(text))
+            if (images.isNotEmpty()) {
+                putJsonArray("attachments") {
+                    images.forEach { img ->
+                        addJsonObject {
+                            put("type", kotlinx.serialization.json.JsonPrimitive("image"))
+                            put("data", kotlinx.serialization.json.JsonPrimitive(java.util.Base64.getEncoder().encodeToString(img.bytes)))
+                            put("mimeType", kotlinx.serialization.json.JsonPrimitive(img.mime))
+                            put("filename", kotlinx.serialization.json.JsonPrimitive(img.name))
+                        }
+                    }
+                }
+            }
+        }.toString()
 
-    suspend fun sendMessage(sessionId: String, text: String) =
-        post<JsonObject>(
-            "/api/agents/coder/$sessionId",
-            kotlinx.serialization.json.buildJsonObject {
-                put("kind", kotlinx.serialization.json.JsonPrimitive("user"))
-                put("body", kotlinx.serialization.json.JsonPrimitive(text))
-            }.toString(),
-        )
+    /** Message the project's coordinator — the flue admission body, same as a task prompt. */
+    suspend fun sendCoordinator(spaceId: String, text: String, images: List<PendingUpload> = emptyList()) =
+        post<JsonObject>("/api/agents/coordinator/$spaceId", admissionBody(text, images))
+
+    suspend fun sendMessage(sessionId: String, text: String, images: List<PendingUpload> = emptyList()) =
+        post<JsonObject>("/api/agents/coder/$sessionId", admissionBody(text, images))
 
     /** What the web's composer Stop calls: stops the reply, keeps the sandbox. */
     suspend fun abortSession(id: String) = post<JsonObject>("/api/agents/coder/$id/abort")
@@ -209,18 +223,28 @@ class AntonApi(private val config: () -> ServerConfig) {
         }
     }
 
-    suspend fun uploadAttachment(sessionId: String, name: String, file: File, mime: String): JsonObject =
+    /**
+     * A picked file saved where the agent reaches it, returned with the text
+     * Anton read from it — the web's attachToTask/attachToProject.
+     */
+    private suspend fun attach(path: String, file: PendingUpload): AttachedFileDto =
         withContext(Dispatchers.IO) {
-            val req = Request.Builder().url(url("/api/sessions/$sessionId/attachments?name=${java.net.URLEncoder.encode(name, "UTF-8")}"))
+            val req = Request.Builder().url(url("$path?name=${java.net.URLEncoder.encode(file.name, "UTF-8")}"))
                 .withAuth()
-                .post(file.asRequestBody(mime.toMediaType()))
+                .post(file.bytes.toRequestBody(file.mime.ifBlank { "application/octet-stream" }.toMediaType()))
                 .build()
             http.newCall(req).execute().use { res ->
                 val text = res.body?.string().orEmpty()
                 if (!res.isSuccessful) throw ApiError(res.code, text)
-                json.decodeFromString<JsonObject>(text.ifBlank { "{}" })
+                json.decodeFromString<AttachedFileDto>(text.ifBlank { "{}" })
             }
         }
+
+    /** Saved to the task's Library under uploads/ — a thread composer's files. */
+    suspend fun attachToTask(sessionId: String, file: PendingUpload) = attach("/api/sessions/$sessionId/attachments", file)
+
+    /** Saved to the project's Library — a coordinator message's files, which its threads can then be handed. */
+    suspend fun attachToProject(spaceId: String, file: PendingUpload) = attach("/api/spaces/$spaceId/attachments", file)
 }
 
 /** A web origin includes the scheme and effective port, not just a hostname prefix. */

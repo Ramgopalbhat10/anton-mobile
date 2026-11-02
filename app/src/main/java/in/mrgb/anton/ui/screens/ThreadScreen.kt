@@ -26,6 +26,7 @@ import com.mikepenz.markdown.m3.markdownTypography
 import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.FileDiff
 import `in`.mrgb.anton.data.api.MessageDto
+import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.Outputs
 import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
@@ -51,7 +52,7 @@ fun ThreadScreen(
     sending: Boolean,
     webUrl: String,
     onBack: () -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (String, OutgoingDraft) -> Unit,
     onAbort: () -> Unit,
     onStop: () -> Unit,
     onModel: (model: String, reasoning: String?) -> Unit,
@@ -102,7 +103,7 @@ fun ThreadScreen(
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(
-                LocalAnswer provides onSend,
+                LocalAnswer provides { text -> onSend(text, OutgoingDraft()) },
                 LocalRuns provides bundle?.runs.orEmpty(),
                 LocalFilePlace provides FilePlace(sessionId = s?.id, spaceId = s?.spaceId),
             ) {
@@ -411,7 +412,7 @@ private fun QueuedNote(text: String) {
 @Composable
 private fun Composer(
     working: Boolean, sending: Boolean,
-    onSend: (String) -> Unit, onStop: () -> Unit,
+    onSend: (String, OutgoingDraft) -> Unit, onStop: () -> Unit,
     model: String, reasoning: String?, models: List<ModelDto>,
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
 ) {
@@ -424,6 +425,7 @@ private fun Composer(
             modelIcon = if (model.isBlank()) null else ({ ModelMark(Catalog.find(models, model), model, 13.dp) }),
             modelFacts = if (model.isBlank()) null else ({ ModelFacts(models, model, reasoning) }),
             onSend = onSend, onStop = onStop,
+            seesImages = Catalog.find(models, model)?.vision != false,
             onOpenModel = onLoadModels,
             modelPicker = { dismiss ->
                 ModelPickerSheet(models = models, selected = model, reasoning = reasoning, onPick = { id, level -> dismiss(); onModel(id, level) }, onDismiss = dismiss)

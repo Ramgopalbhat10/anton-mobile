@@ -82,9 +82,9 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         runCatching { repo.models() }.onSuccess { r -> _models.value = r.models }
     }
 
-    fun send(text: String) = viewModelScope.launch {
+    fun send(text: String, outgoing: OutgoingDraft = OutgoingDraft()) = viewModelScope.launch {
         sending.value = true
-        runCatching { repo.send(sessionId, text) }
+        runCatching { repo.send(sessionId, text, outgoing) }
             .onFailure { error.value = it.message }
         sending.value = false
         refresh()
@@ -153,9 +153,9 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
         runCatching { repo.api.spaceMessages(id) }.onSuccess { coordinatorMessages.value = it }
     }
 
-    fun sendCoordinator(id: String, text: String) = viewModelScope.launch {
+    fun sendCoordinator(id: String, text: String, outgoing: OutgoingDraft = OutgoingDraft()) = viewModelScope.launch {
         sending.value = true
-        runCatching { repo.api.sendCoordinator(id, text) }.onFailure { error.value = it.message }
+        runCatching { repo.sendCoordinator(id, text, outgoing) }.onFailure { error.value = it.message }
         sending.value = false
         refreshCoordinator(id)
     }
@@ -207,19 +207,23 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
 
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
-    fun start(projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?, onDone: (String?) -> Unit) = viewModelScope.launch {
+    fun start(
+        projectId: String?, branch: String?, prompt: String, model: String?, reasoning: String?,
+        outgoing: OutgoingDraft = OutgoingDraft(), onDone: (String?) -> Unit,
+    ) = viewModelScope.launch {
         creating.value = true
         error.value = null
+        val named = prompt.ifBlank { outgoing.files.firstOrNull()?.name ?: if (outgoing.images.isNotEmpty()) "Look at the attached image" else "" }
         val created = runCatching {
             repo.api.createSession(
-                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = prompt.take(200), model = model, planMode = planFirst.value, reasoning = reasoning)
+                CreateSessionRequest(projectId = projectId, branch = branch, titleFrom = named.take(200), model = model, planMode = planFirst.value, reasoning = reasoning)
             )
         }
         val id = created.getOrNull()?.id
         if (id == null) {
             error.value = created.exceptionOrNull()?.message
         } else {
-            runCatching { repo.send(id, prompt) }.onFailure { error.value = it.message }
+            runCatching { repo.send(id, prompt, outgoing) }.onFailure { error.value = it.message }
         }
         creating.value = false
         onDone(id)
