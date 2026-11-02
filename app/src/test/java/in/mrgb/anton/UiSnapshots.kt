@@ -257,12 +257,23 @@ class UiSnapshots {
     fun coordinatorView() = snap {
         CoordinatorScreen(
             spaceId = "space_b", name = "mrgb",
-            messages = threadMessages,
+            messages = coordinatorFixture(),
+            threads = coordinatorThreads,
+            threadsLoaded = true,
             sending = false, model = "openai/gpt-6.1-terra[fast]", reasoning = null,
             models = models,
             onModel = { _, _ -> }, onLoadModels = {}, onSend = { _, _ -> }, onBack = {},
         )
     }
+
+    @Test
+    fun coordinatorEntries() = CoordinatorScenes(paparazzi).entries()
+
+    @Test
+    fun coordinatorInteractions() = CoordinatorScenes(paparazzi).interactions()
+
+    @Test
+    fun coordinatorLargeText() = CoordinatorScenes(paparazzi).largeText()
 
     @Test
     fun threadView() = snap {

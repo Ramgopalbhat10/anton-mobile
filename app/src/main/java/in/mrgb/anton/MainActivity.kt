@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.mrgb.anton.ui.components.AntonSheet
@@ -123,7 +124,10 @@ private fun App() {
         }
         is Screen.Project -> {
             val vm = projectsVm(app)
-            LaunchedEffect(s.id) { vm.open(s.id) }
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             ProjectDetailScreen(
                 space = vm.detail.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
@@ -134,10 +138,17 @@ private fun App() {
         }
         is Screen.Coordinator -> {
             val vm = projectsVm(app)
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             CoordinatorScreen(
                 spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
+                threads = vm.threads.collectAsState().value,
+                threadsLoaded = vm.threadsLoaded.collectAsState().value,
+                onOpenThread = { push(Screen.Thread(it)) },
                 sending = vm.coordinatorDraft(s.id).sending,
                 draft = vm.coordinatorDraft(s.id),
                 model = vm.coordinatorModel.collectAsState().value ?: "",

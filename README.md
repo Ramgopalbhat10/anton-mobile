@@ -35,6 +35,8 @@ The app reads through `GET /api/mobile/*` on anton-v2 (branch `devin/mobile-api-
 
 Sending stays on `POST /api/agents/coder/:id` (budget checks + priming run there); live updates ride the same `GET /api/events` SSE stream; attachments upload to `POST /api/sessions/:id/attachments`.
 
+The project/coordinator feed observes JSON SSE invalidations while its screen is started, refetching sessions on creation rather than treating a change event as a session object. Reconnects also invalidate the list. A 2-second visible-screen poll catches coordinator transcript updates (the coarse stream does not carry reply tokens) and silent stream loss; backgrounding or leaving the screen stops this observer. Creation entries follow the current thread's state, question/reply and PR metadata. Later reports retain the historical event's status and preview. Both default to title/status only: tap to expand a bounded Markdown preview, then tap that preview to open the thread.
+
 ## Auth
 
 The server sits behind Cloudflare Access. The app sends a **Service Token** only to the configured server's exact origin (scheme, host, and port), including the SSE stream and uploads. External artifact URLs are fetched without these credentials; redirects are checked on every network hop:

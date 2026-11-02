@@ -149,6 +149,8 @@ data class PartDto(
     val recommended: JsonElement? = null,
     val answer: JsonElement? = null,
     val hint: String? = null,
+    /** Coordinator news: preserve the report batch and each thread's creation origin. */
+    val reports: List<ThreadReportDto> = emptyList(),
     /** Tool calls: what was called with, what came back, and how it failed. */
     val input: JsonElement? = null,
     val output: JsonElement? = null,
@@ -261,3 +263,13 @@ data class CreateSessionRequest(
 
 @Serializable
 data class AgentMessageRequest(val message: String)
+
+@Serializable
+data class ThreadReportDto(
+    val id: String = "",
+    val title: String = "Thread",
+    val state: String = "idle",
+    val text: String = "",
+    val started: String? = null,
+    val pr: String? = null,
+)

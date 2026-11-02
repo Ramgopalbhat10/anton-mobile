@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
+import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
@@ -39,10 +40,15 @@ fun CoordinatorScreen(
     onBack: () -> Unit,
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
+    threads: List<SessionDto> = emptyList(),
+    threadsLoaded: Boolean = false,
+    onOpenThread: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    // Follow fresh replies only at the tail; inspecting an older preview must not jump.
+    val atTail by remember { derivedStateOf { !listState.canScrollForward } }
+    LaunchedEffect(messages) {
+        if (atTail && messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
     Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
@@ -53,23 +59,7 @@ fun CoordinatorScreen(
                     item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
                 }
                 items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") {
-                        m.parts.forEach { p ->
-                            when (p.type) {
-                                "thread" -> ThreadCard(p)
-                                "file" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                    val name = p.title ?: p.path?.substringAfterLast('/') ?: "attachment"
-                                    val viewer = LocalViewer.current
-                                    if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, name, height = 120.dp, caption = false)
-                                    else FileChip(
-                                        name, p.mediaType,
-                                        onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name, u)), 0) } },
-                                    )
-                                }
-                                else -> UserMessage(m.copy(parts = listOf(p)))
-                            }
-                        }
-                    } else AgentMessage(m)
+                    CoordinatorMessage(m, threads, threadsLoaded, onOpenThread)
                 }
             }
             }
