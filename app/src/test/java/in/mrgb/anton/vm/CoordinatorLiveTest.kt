@@ -191,9 +191,30 @@ class CoordinatorLiveTest {
                     assertTrue(vm.threadsLoaded.value)
                     server.fail = false
                     server.sessions = "[]"
-                    dispatcher.scheduler.advanceTimeBy(2001)
+                    dispatcher.scheduler.advanceTimeBy(16_001) // The slow full reload, for a silently dropped stream.
                     await { vm.threads.value.isEmpty() && vm.error.value == null }
                     assertEquals("new", vm.detail.value!!.id)
+                } finally { vm.viewModelScope.cancel() }
+            }
+        } finally { Dispatchers.resetMain() }
+    }
+
+    @Test fun anIdleCoordinatorIsNotPolledOnlyReloadedSlowly() = runBlocking {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            Server().use { server ->
+                server.transcript = """[{"id":"done","role":"assistant","parts":[{"type":"text","text":"All set"}],"metadata":{"usage":{"inputTokens":1}}}]"""
+                val vm = ProjectsViewModel(server.repo)
+                try {
+                    vm.watch("project1")
+                    await { vm.coordinatorMessages.value.singleOrNull()?.hasUsage == true }
+                    val loaded = server.requests.size
+                    repeat(7) { dispatcher.scheduler.advanceTimeBy(2_000) }
+                    delay(100)
+                    assertEquals(loaded, server.requests.size) // A finished reply: no transcript polling.
+                    dispatcher.scheduler.advanceTimeBy(2_001)
+                    await { server.requests.size == loaded + 3 } // The 16s safety reload: space, sessions, transcript.
                 } finally { vm.viewModelScope.cancel() }
             }
         } finally { Dispatchers.resetMain() }

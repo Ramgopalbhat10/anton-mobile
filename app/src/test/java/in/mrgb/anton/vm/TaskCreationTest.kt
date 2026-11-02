@@ -140,4 +140,18 @@ class TaskCreationTest {
         assertSame(upload, state.draft.attachments.snapshot().images.single())
         assertEquals("created", state.sessionId)
     }
+
+    @Test fun startOverUnlocksChoicesKeepsDraftAndCreatesAFreshTask() = runTest {
+        val state = state()
+        state.start(false, { SessionDto("created") }, { _, _, _ -> throw IllegalStateException("Offline") })
+        assertTrue(state.choicesLocked)
+        state.startOver()
+        assertNull(state.sessionId)
+        assertNull(state.draft.error)
+        assertFalse(state.choicesLocked)
+        assertEquals("Describe this", state.draft.text)
+        assertSame(upload, state.draft.attachments.snapshot().images.single())
+        state.start(false, { SessionDto("fresh") }, { id, _, _ -> assertEquals("fresh", id) })
+        assertEquals("fresh", state.consumeCompleted())
+    }
 }

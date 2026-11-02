@@ -214,15 +214,6 @@ class UiSnapshots {
     fun extensionlessImageViewer() = TaskAttachmentScenes(paparazzi).extensionlessImageViewer()
 
     @Test
-    fun confirmDiscardTask() = TaskAttachmentScenes(paparazzi).confirmDiscardTask()
-
-    @Test
-    fun discardCleanupFailure() = TaskAttachmentScenes(paparazzi).discardCleanupFailure()
-
-    @Test
-    fun newTaskAfterDiscard() = TaskAttachmentScenes(paparazzi).newTaskAfterDiscard()
-
-    @Test
     fun tasksScreen() = snap {
         TasksScreen(
             sessions = tasks, tab = TasksTab.All, query = "",
@@ -375,7 +366,7 @@ class UiSnapshots {
             branches = listOf("main", "devin/mobile", "anton/feature-flags"),
             defaultBranch = "main",
             models = models, planFirst = true, creating = false,
-            onRepo = {}, onPlanFirst = {}, onStart = {}, onDiscard = {}, onDismiss = {},
+            onRepo = {}, onPlanFirst = {}, onStart = {}, onDismiss = {},
         )
     }
 

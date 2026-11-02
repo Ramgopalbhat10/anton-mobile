@@ -139,8 +139,8 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier.fillMaxWidth().clip(shape)
-                .background(if (entry.creation) Anton.CardBg else Anton.WellBg)
-                .border(if (headerFocused) 2.dp else 1.dp, if (headerFocused) Anton.Accent else if (entry.creation) Anton.CardBorder else Anton.BorderSubtle, shape)
+                .background(Anton.WellBg)
+                .border(if (headerFocused) 2.dp else 1.dp, if (headerFocused) Anton.Accent else Anton.BorderSubtle, shape)
                 .clickable(interactionSource = headerInteractions, indication = LocalIndication.current, role = Role.Button, onClickLabel = if (expanded) "Collapse preview" else "Expand preview", onClick = { beforeToggle(); onToggle() })
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                 .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
@@ -154,7 +154,7 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
         if (expanded) {
             val open = { entry.threadId?.let(onOpen); Unit }
             Column(
-                Modifier.padding(start = if (entry.creation) 0.dp else 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                Modifier.padding(start = 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
                     .background(Anton.WellBg).border(if (previewFocused) 2.dp else 1.dp, if (previewFocused) Anton.Accent else Anton.BorderSubtle, RoundedCornerShape(10.dp))
                     .clickable(interactionSource = previewInteractions, indication = LocalIndication.current, enabled = entry.threadId != null, role = Role.Button, onClickLabel = "Open thread", onClick = open)
                     .padding(12.dp),

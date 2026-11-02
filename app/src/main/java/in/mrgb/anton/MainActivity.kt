@@ -238,7 +238,6 @@ private fun App() {
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
                 onStart = { vm.start() },
-                onDiscard = { vm.discard() },
                 onDismiss = { newTask = false },
             )
         }
