@@ -102,8 +102,6 @@ class AntonApi(private val config: () -> ServerConfig) {
 
     suspend fun space(id: String) = get<SpaceDto>("/api/mobile/spaces/$id")
 
-    suspend fun threadOutputs(id: String) = get<ThreadOutputsDto>("/api/sessions/$id/outputs").outputs
-
     suspend fun models() = get<ModelsResponse>("/api/mobile/models")
 
     suspend fun projects() = get<ProjectsResponse>("/api/projects").projects

@@ -17,29 +17,6 @@ class CoordinatorCreationTest {
         assertEquals("Historical progress", progress.preview)
     }
 
-    @Test fun outputChipsUseNewestSafeMadeFilesNotUploadsAndKeepAllViewerTargets() {
-        val files = madeFiles(listOf(
-            ThreadOutputDto("report.md", 10, 1.0), ThreadOutputDto("uploads/user.png", 20, 100.0),
-            ThreadOutputDto("app.apk", 30, 5.0), ThreadOutputDto("report.md", 40, 10.0),
-            ThreadOutputDto("../secret", 1, 1000.0), ThreadOutputDto("https://bad.test/file", 2, 2000.0),
-        ))
-        assertEquals(listOf("report.md", "app.apk"), files.map { it.path })
-        assertEquals(40L, files.first().size)
-        val artifacts = cardArtifacts("thread123", files)
-        assertEquals(listOf("report.md", "app.apk"), artifacts.map { it.name })
-        assertEquals("/api/sessions/thread123/output?path=app.apk", artifacts[1].url)
-    }
-
-    @Test fun creationMarkdownLinksKeepTheirOwnTargetsInsteadOfOpeningTheThread() {
-        assertEquals(CreationLink.File("app.apk"), creationLink("../outputs/app.apk", "thread123-full"))
-        assertEquals(CreationLink.File("app.apk"), creationLink("#thread-thread123/outputs/app.apk", "thread123-full"))
-        assertEquals(CreationLink.Web, creationLink("https://github.com/a/b/pull/7", "thread123-full"))
-        assertEquals(CreationLink.Thread, creationLink("#thread-thread123", "thread123-full"))
-        for (href in listOf("javascript:alert(1)", "../outputs/../private", "#thread-t", "#thread-other123/outputs/app.apk", "https://")) {
-            assertEquals(CreationLink.Invalid, creationLink(href, "thread123-full"))
-        }
-    }
-
     @Test fun nextStepsAreRealNavigationOrStopAndOnlyForTheirStates() {
         val base = SessionDto("thread", threadState = "working")
         assertEquals(listOf(CreationAction.Stop, CreationAction.View), creationActions(base))

@@ -10,11 +10,9 @@ import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -133,16 +131,10 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     val threads = _threads.asStateFlow()
     val error = MutableStateFlow<String?>(null)
     val threadsLoaded = MutableStateFlow(false)
-    val cardFiles = MutableStateFlow<Map<String, ThreadCardFiles>>(emptyMap())
     val cardActions = MutableStateFlow<Map<String, ThreadCardAction>>(emptyMap())
     private var activeSpace: String? = null
     private var watching: Job? = null
-    /** The open project's refresh loop and file loads run here; leaving the screen cancels it all. */
-    private var watchScope: CoroutineScope? = null
     private var reloads: Channel<Unit>? = null
-    private val fileJobs = mutableMapOf<String, Job>()
-    /** Cards whose files were loaded since the screen last came into view. */
-    private val freshFiles = mutableSetOf<String>()
     private val transcriptLock = Mutex()
     private var transcriptChangedAt = 0L
 
@@ -187,17 +179,13 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             coordinatorMessages.value = emptyList()
             coordinatorModel.value = null
             coordinatorReasoning.value = null
-            cardFiles.value = emptyMap()
         }
         cardActions.value = emptyMap()
-        freshFiles.clear()
         return viewModelScope.launch {
-            watchScope = this
             loadModels()
             val signals = Channel<Unit>(Channel.CONFLATED).also { reloads = it }
             launch {
                 repo.changes.collect { e ->
-                    if (e.name == "task" && e.id in cardFiles.value && e.what in setOf("files", "state")) loadThreadFiles(e.id!!, force = true)
                     if (e.name == "sessions" || e.name == "spaces" ||
                         (e.name == "space" && (e.id == null || e.id == id)) ||
                         (e.name == "task" && (e.id == null || _threads.value.any { it.id == e.id }))) signals.trySend(Unit)
@@ -214,9 +202,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
                     else if (coordinatorReplying()) quietly { loadTranscript(id) }
                 }
             }
-            loadProject(id)
-            // Cards already on screen refresh their files once the screen is back.
-            cardFiles.value.keys.forEach { loadThreadFiles(it) }
+            signals.trySend(Unit)
             for (ignored in signals) loadProject(id)
         }.also { watching = it }
     }
@@ -256,29 +242,6 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     } catch (e: Exception) {
         error.value = e.message
         false
-    }
-
-    /** A card's Library, loaded when the card is first shown; [force] reloads it after a files/state change. */
-    fun loadThreadFiles(threadId: String, force: Boolean = false): Job? {
-        val scope = watchScope?.takeIf { it.isActive } ?: return null
-        if (_threads.value.none { it.id == threadId }) return null
-        val running = fileJobs[threadId]?.takeIf { it.isActive }
-        if (!force && (running != null || (threadId in freshFiles && cardFiles.value[threadId]?.error == null))) return running
-        running?.cancel()
-        freshFiles += threadId
-        cardFiles.update { it + (threadId to (it[threadId] ?: ThreadCardFiles()).copy(loading = true, error = null)) }
-        val job = scope.launch {
-            val files = try { repo.api.threadOutputs(threadId) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
-            cardFiles.update {
-                it + (threadId to (files?.let(::ThreadCardFiles) ?: (it[threadId] ?: ThreadCardFiles()).copy(loading = false, error = "Couldn't load files")))
-            }
-        }
-        fileJobs[threadId] = job
-        job.invokeOnCompletion { cause ->
-            // Cancelled (screen left, or replaced by a newer load): don't leave a spinner behind.
-            if (cause != null && fileJobs[threadId] === job) cardFiles.update { map -> map[threadId]?.let { map + (threadId to it.copy(loading = false)) } ?: map }
-        }
-        return job
     }
 
     fun stopCoordinatorThread(threadId: String) = viewModelScope.launch {
