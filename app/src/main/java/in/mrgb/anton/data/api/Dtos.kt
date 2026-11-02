@@ -272,4 +272,6 @@ data class ThreadReportDto(
     val text: String = "",
     val started: String? = null,
     val pr: String? = null,
+    /** The historical question can accompany a separate report body. */
+    val asks: String? = null,
 )

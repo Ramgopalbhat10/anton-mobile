@@ -126,11 +126,14 @@ object Transcript {
         val attr = Regex("(\\w+)=\"([^\"]*)\"")
         val reports = block.findAll(wrapper.groupValues[1]).map { m ->
             val attrs = attr.findAll(m.groupValues[1]).associate { it.groupValues[1] to unescapeReport(it.groupValues[2]) }
+            val asks = attrs["asks"]?.trim()?.takeIf { it.isNotEmpty() }
+            val body = unescapeReport(m.groupValues[2]).trim()
             ThreadReportDto(
                 id = attrs["id"].orEmpty(), title = attrs["title"] ?: "Thread",
                 state = attrs["state"].takeIf { it in setOf("waiting", "working", "queued", "review", "landing", "idle", "resolved") } ?: "idle",
-                text = unescapeReport(m.groupValues[2].ifBlank { attrs["asks"].orEmpty() }).trim(),
+                text = body.ifBlank { asks.orEmpty() },
                 started = attrs["started"].takeIf { it == "you" || it == "routine" }, pr = attrs["pr"],
+                asks = asks,
             )
         }.toList()
         // Do not silently discard malformed reports or text between them.

@@ -21,8 +21,50 @@ class CoordinatorEntriesTest {
         assertEquals("A \"title\" & more", reports[0].title)
         assertEquals("idle", reports[1].state)
         assertEquals("Choose <one>", reports[1].text)
+        assertEquals("Choose <one>", reports[1].asks)
         assertEquals("**Report** & `code`", reports[2].text)
+        assertNull(reports[2].asks)
         assertNotNull(reports[0].pr)
+    }
+
+    @Test fun reportWithBothBodyAndAsksKeepsTheHistoricalQuestionAheadOfItsBody() {
+        val report = Transcript.threadParts("""<thread-reports><thread id="abcdef12" title="Waiting" state="waiting" asks="Should I merge &quot;this&quot; &amp; keep &lt;main&gt;?">**Historical body** &amp; `code`</thread></thread-reports>""").single().reports.single()
+        assertEquals("Should I merge \"this\" & keep <main>?", report.asks)
+        assertEquals("**Historical body** & `code`", report.text)
+        val current = thread.copy(threadState = "resolved", asking = "A newer question", lastReply = "A newer reply")
+        val entry = reportEntry(report, listOf(current), true)!!
+        assertEquals(report.asks, entry.asks)
+        assertEquals(report.text, entry.preview)
+        assertEquals("Needs you", entry.status)
+        assertEquals(current.id, entry.threadId)
+        assertEquals(report, Json.decodeFromString(ThreadReportDto.serializer(), Json.encodeToString(ThreadReportDto.serializer(), report)))
+        assertNull(Json.decodeFromString(ThreadReportDto.serializer(), """{"id":"old","text":"Old report"}""").asks)
+    }
+
+    @Test fun asksOnlyIsDecodedOnceAndShownOnceWithoutAnEmptyBodyPlaceholder() {
+        val report = Transcript.threadParts("""<thread-reports><thread id="abcdef12" state="waiting" asks="Choose &amp;lt;one&amp;gt; &amp; keep &quot;two&quot;"/></thread-reports>""").single().reports.single()
+        assertEquals("Choose &lt;one&gt; & keep \"two\"", report.asks)
+        assertEquals(report.asks, report.text) // Keep the existing asks-only text fallback.
+        val entry = reportEntry(report, listOf(thread), true)!!
+        assertEquals(report.asks, entry.asks)
+        assertEquals("", entry.preview)
+    }
+
+    @Test fun blankAsksDoNotHideBodyAndUnresolvedCreationRetainsBothFields() {
+        val parts = Transcript.threadParts("""<thread-reports>
+            <thread id="abcdef12" asks="   ">Body only</thread>
+            <thread id="abcdef12" started="routine" asks=" Historical question "> Historical body </thread>
+            <thread id="empty123" asks=" "/>
+        </thread-reports>""").single().reports
+        assertNull(parts[0].asks)
+        assertEquals("Body only", reportEntry(parts[0], listOf(thread), true)!!.preview)
+        val unresolved = reportEntry(parts[1], emptyList(), false)!!
+        assertEquals("Historical question", unresolved.asks)
+        assertEquals("Historical body", unresolved.preview)
+        val live = reportEntry(parts[1], listOf(thread.copy(asking = "Live question")), true)!!
+        assertNull(live.asks)
+        assertEquals("Live question", live.preview)
+        assertEquals("No report preview.", reportEntry(parts[2], emptyList(), false)!!.preview)
     }
 
     @Test fun ordinaryMixedMalformedAndPartialTextIsNotStripped() {

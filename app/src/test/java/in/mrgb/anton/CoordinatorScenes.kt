@@ -53,7 +53,7 @@ internal class CoordinatorScenes(private val paparazzi: Paparazzi) {
         }
     }
 
-    fun largeText() = paparazzi.snapshot {
+    fun largeText(report: ThreadReportDto = this.report) = paparazzi.snapshot {
         CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
             frame {
                 CoordinatorEntryView(reportEntry(report.copy(title = "A long thread title that must remain readable at large text sizes"), coordinatorThreads, true)!!, true, {}, {})
@@ -62,8 +62,13 @@ internal class CoordinatorScenes(private val paparazzi: Paparazzi) {
         }
     }
 
+    fun questionAndBody(large: Boolean = false) {
+        val parsed = Transcript.threadParts("""<thread-reports><thread id="cursor12" title="Cursor Plus subscription error" state="waiting" asks="Should I merge this fix?">${report.text}</thread></thread-reports>""").single().reports.single()
+        if (large) largeText(parsed) else interactions(parsed)
+    }
+
     @OptIn(InternalComposeUiApi::class)
-    fun interactions() {
+    fun interactions(report: ThreadReportDto = this.report) {
         // Exercise the actual control's accessibility actions (also used by TalkBack).
         // State is hoisted here because Paparazzi disposes its recomposer per capture.
         val view = ComposeView(paparazzi.context)
@@ -79,13 +84,19 @@ internal class CoordinatorScenes(private val paparazzi: Paparazzi) {
         fun toggle() = all().single { it.config.getOrNull(SemanticsProperties.StateDescription) != null }
         assertEquals("Collapsed", toggle().config[SemanticsProperties.StateDescription])
         assertEquals(Role.Button, toggle().config[SemanticsProperties.Role])
-        assertFalse(all().any { it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text.contains("integration bug") } == true })
+        assertFalse(all().any { it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text.contains("integration bug") || (report.asks != null && text.text.contains(report.asks)) } == true })
         assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke())
         assertNull(opened)
         assertTrue(expanded)
         view.disposeComposition()
         paparazzi.snapshot(view, name = "expanded")
         assertEquals("Expanded", toggle().config[SemanticsProperties.StateDescription])
+        report.asks?.let { question ->
+            val text = all().flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.joinToString("\n") { it.text }
+            assertTrue("Expanded report must expose its question", text.contains(question))
+            assertTrue("Expanded report must retain its body", text.contains("integration bug"))
+            assertTrue("The question must precede the bounded report body", text.indexOf(question) < text.indexOf("integration bug"))
+        }
         val preview = all().first { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Open thread" }
         assertEquals(Role.Button, preview.config[SemanticsProperties.Role])
         assertTrue(preview.config[SemanticsActions.OnClick].action!!.invoke())

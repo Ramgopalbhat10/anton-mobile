@@ -39,6 +39,7 @@ internal data class CoordinatorEntry(
     val metadata: String,
     val threadId: String?,
     val creation: Boolean,
+    val asks: String? = null,
 )
 
 internal fun resolveThread(threads: List<SessionDto>, id: String): SessionDto? =
@@ -92,8 +93,11 @@ internal fun reportEntry(report: ThreadReportDto, threads: List<SessionDto>, loa
         "resolved" -> "Done"
         else -> "Replied"
     }
-    return CoordinatorEntry(report.title, status, glyphKindOf(report.state, "idle", false), report.text.ifBlank { "No report preview." },
-        listOfNotNull(if (report.started == "routine") "Started by a routine" else if (report.started == "you") "Started by you" else "Thread update", report.pr?.let { "PR $it" }).joinToString(" · "), thread?.id, report.started != null)
+    val asks = report.asks?.trim()?.takeIf { it.isNotEmpty() }
+    // An asks-only report also uses the question as its text fallback; show it only once.
+    val body = report.text.takeUnless { it.trim() == asks }.orEmpty()
+    return CoordinatorEntry(report.title, status, glyphKindOf(report.state, "idle", false), body.ifBlank { if (asks == null) "No report preview." else "" },
+        listOfNotNull(if (report.started == "routine") "Started by a routine" else if (report.started == "you") "Started by you" else "Thread update", report.pr?.let { "PR $it" }).joinToString(" · "), thread?.id, report.started != null, asks)
 }
 
 /** Bounded Markdown, not raw report syntax, and never a full report body. */
@@ -149,8 +153,17 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
                 Text(entry.metadata, style = Type.Meta, color = Anton.TextSecondary)
                 // Links within the excerpt share its one action: open this thread.
                 CompositionLocalProvider(LocalUriHandler provides object : UriHandler { override fun openUri(uri: String) = open() }) {
-                    Box(Modifier.heightIn(max = with(LocalDensity.current) { 84.sp.toDp() }).clipToBounds()) {
-                        Markdown(compactPreview(entry.preview), modifier = Modifier.fillMaxWidth(), colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
+                    // Keep the historical question ahead of and separately bounded from the body:
+                    // a long report must never push its question outside the clipped preview.
+                    entry.asks?.let { question ->
+                        Box(Modifier.heightIn(max = with(LocalDensity.current) { 84.sp.toDp() }).clipToBounds()) {
+                            Markdown(compactPreview(question), modifier = Modifier.fillMaxWidth(), colors = mdColors(Anton.WarningText), typography = mdType(small = true), padding = mdPadding())
+                        }
+                    }
+                    if (entry.preview.isNotBlank()) {
+                        Box(Modifier.heightIn(max = with(LocalDensity.current) { 84.sp.toDp() }).clipToBounds()) {
+                            Markdown(compactPreview(entry.preview), modifier = Modifier.fillMaxWidth(), colors = mdColors(Anton.TextSecondary), typography = mdType(small = true), padding = mdPadding())
+                        }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -191,7 +204,7 @@ internal fun CoordinatorMessage(m: MessageDto, threads: List<SessionDto>, loaded
                 p.type == "thread-reports" -> p.reports.forEach { report ->
                     key(report.id, report.started) { reportEntry(report, threads, loaded)?.let { CoordinatorThreadEntry(it, onOpen) } }
                 }
-                p.type == "thread" -> reportEntry(ThreadReportDto(p.name.orEmpty(), p.title ?: "Thread", p.state ?: "idle", p.text ?: p.question.orEmpty()), threads, loaded)?.let { CoordinatorThreadEntry(it, onOpen) }
+                p.type == "thread" -> reportEntry(ThreadReportDto(p.name.orEmpty(), p.title ?: "Thread", p.state ?: "idle", p.text ?: p.question.orEmpty(), asks = p.question), threads, loaded)?.let { CoordinatorThreadEntry(it, onOpen) }
                 p.type == "tool" && p.name == "start_thread" -> key(p.toolCallId) {
                     creationEntry(p, threads, loaded, !m.hasUsage)?.let { CoordinatorThreadEntry(it, onOpen) }
                 }
