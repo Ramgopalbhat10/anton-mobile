@@ -54,6 +54,7 @@ fun NewTaskSheet(
 ) {
     LaunchedEffect(state) { state.initialize(repos.firstOrNull()?.first, models.firstOrNull { it.variant == null }?.id) }
     val repo = state.projectId
+    val incognito = state.incognito
     val branch = state.branch
     val prompt = state.draft.text
     val model = state.model
@@ -98,7 +99,7 @@ fun NewTaskSheet(
                 maxLines = 10,
                 interactionSource = interaction,
                 decorationBox = { inner ->
-                    if (prompt.isEmpty()) Text("What should the agent do?", style = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp), color = Anton.TextTertiary)
+                    if (prompt.isEmpty()) Text(if (incognito) "Ask anything — this chat is never saved" else "What should the agent do?", style = Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp), color = Anton.TextTertiary)
                     inner()
                 },
             )
@@ -126,17 +127,26 @@ fun NewTaskSheet(
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AntonSelect(
-                        options = listOf(SelectOption<String?>(null, "Chat (no repo)", "No sandbox repo")) +
-                            repos.map { (id, name) -> SelectOption<String?>(id, name.substringAfterLast('/'), name.substringBeforeLast('/', "").ifBlank { null }) },
+                        options = listOf(
+                            SelectOption<String?>(null, "Chat (no repo)", "No sandbox repo"),
+                            SelectOption<String?>(TaskCreation.INCOGNITO, "Incognito", "A chat that is never saved"),
+                        ) + repos.map { (id, name) -> SelectOption<String?>(id, name.substringAfterLast('/'), name.substringBeforeLast('/', "").ifBlank { null }) },
                         selected = repo,
                         enabled = !locked,
-                        onSelect = { id -> if (!locked) { state.projectId = id; state.branch = null; onRepo(id) } },
-                        label = repos.firstOrNull { it.first == repo }?.second?.substringAfterLast('/') ?: "Chat",
-                        icon = if (repo == null) Lucide.MessageSquare else Lucide.Github,
+                        onSelect = { id -> if (!locked) { state.projectId = id; state.branch = null; onRepo(if (id == TaskCreation.INCOGNITO) null else id) } },
+                        label = when {
+                            incognito -> "Incognito"
+                            else -> repos.firstOrNull { it.first == repo }?.second?.substringAfterLast('/') ?: "Chat"
+                        },
+                        icon = when {
+                            incognito -> Lucide.EyeOff
+                            repo == null -> Lucide.MessageSquare
+                            else -> Lucide.Github
+                        },
                         searchPlaceholder = "Search repositories…",
                         modifier = Modifier.widthIn(max = 180.dp),
                     )
-                    if (repo != null) {
+                    if (repo != null && !incognito) {
                         val current = branch ?: defaultBranch ?: "main"
                         AntonSelect(
                             options = branches.ifEmpty { listOf(current) }.map { SelectOption(it, it) },
@@ -170,7 +180,7 @@ fun NewTaskSheet(
                         }
                     }
                 }
-                AntonSwitch(planFirst, onPlanFirst, enabled = !locked)
+                if (!incognito) AntonSwitch(planFirst, onPlanFirst, enabled = !locked)
                 Box(
                     Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
                         .background(if (canStart) Anton.Accent else Anton.N750)
@@ -178,7 +188,7 @@ fun NewTaskSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Lucide.ArrowUp, if (state.discarding) "Deleting task…" else if (creating) "Starting…" else if (state.sessionId != null) "Retry sending" else "Start task",
+                        Lucide.ArrowUp, if (state.discarding) "Deleting task…" else if (creating) "Starting…" else if (state.sessionId != null) "Retry sending" else if (incognito) "Start incognito chat" else "Start task",
                         tint = if (canStart) Anton.AccentFg else Anton.TextDisabled, modifier = Modifier.size(16.dp),
                     )
                 }

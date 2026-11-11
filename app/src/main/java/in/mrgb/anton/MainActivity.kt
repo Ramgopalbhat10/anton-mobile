@@ -44,6 +44,7 @@ private sealed class Screen {
     data object Activity : Screen()
     data object Settings : Screen()
     data class Thread(val id: String) : Screen()
+    data class Incognito(val id: String) : Screen()
     data class Project(val id: String) : Screen()
     data class Coordinator(val id: String, val name: String) : Screen()
 }
@@ -78,7 +79,7 @@ private fun App() {
         is Screen.Projects, is Screen.Project, is Screen.Coordinator -> 1
         is Screen.Activity -> 2
         is Screen.Settings -> 3
-        is Screen.Thread -> 0
+        is Screen.Thread, is Screen.Incognito -> 0
     }
     val nav: (Int) -> Unit = {
         // Tab taps reset the stack to that tab's root.
@@ -173,6 +174,25 @@ private fun App() {
                 onLoadModels = vm::loadModels,
             )
         }
+        is Screen.Incognito -> {
+            val vm = incognitoVm(app, s.id)
+            IncognitoScreen(
+                messages = vm.messages.collectAsState().value,
+                settlements = vm.settlements.collectAsState().value,
+                models = vm.models.collectAsState().value,
+                model = vm.model.collectAsState().value ?: "",
+                reasoning = vm.reasoning.collectAsState().value,
+                sending = vm.draft.sending,
+                draft = vm.draft,
+                onBack = { back.removeAt(back.lastIndex) },
+                onSend = vm::send,
+                onAnswer = vm::answer,
+                onStop = vm::stop,
+                onModel = vm::setModel,
+                onLoadModels = vm::loadModels,
+                onClose = vm::close,
+            )
+        }
         is Screen.Activity -> {
             val vm = tasksVm(app)
             ActivityScreen(
@@ -204,9 +224,9 @@ private fun App() {
     if (newTask) {
         val vm = newTaskVm(app)
         LaunchedEffect(vm.creation.completedId) {
-            vm.creation.consumeCompleted()?.let { id ->
+            vm.creation.consumeCompleted()?.let { done ->
                 newTask = false
-                push(Screen.Thread(id))
+                push(if (done.incognito) Screen.Incognito(done.id) else Screen.Thread(done.id))
             }
         }
         AntonSheet(onDismiss = { newTask = false }, title = "New task") {
@@ -256,6 +276,7 @@ private fun ActivityScreen(
 @Composable private fun tasksVm(app: AntonApp) = viewModel<TasksViewModel>(factory = factory { TasksViewModel(app.repository) })
 @Composable private fun projectsVm(app: AntonApp) = viewModel<ProjectsViewModel>(factory = factory { ProjectsViewModel(app.repository) })
 @Composable private fun threadVm(app: AntonApp, id: String) = viewModel<ThreadViewModel>(key = "thread-$id", factory = factory { ThreadViewModel(app.repository, id) })
+@Composable private fun incognitoVm(app: AntonApp, id: String) = viewModel<IncognitoViewModel>(key = "incognito-$id", factory = factory { IncognitoViewModel(app.repository, id) })
 @Composable private fun settingsVm(app: AntonApp) = viewModel<SettingsViewModel>(factory = factory { SettingsViewModel(app.store) })
 @Composable private fun newTaskVm(app: AntonApp) = viewModel<NewTaskViewModel>(factory = factory { NewTaskViewModel(app.repository, app.store) })
 

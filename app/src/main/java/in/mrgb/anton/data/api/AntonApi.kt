@@ -195,6 +195,37 @@ class AntonApi(private val config: () -> ServerConfig) {
     suspend fun sendMessage(sessionId: String, text: String, images: List<PendingUpload> = emptyList()) =
         post<JsonObject>("/api/agents/coder/$sessionId", admissionBody(text, images))
 
+    /**
+     * An incognito chat's conversation — the same agent router shape a task's
+     * thread reads, served from the server's in-memory store only.
+     */
+    suspend fun incognitoConversation(id: String): ConversationDto =
+        Transcript.conversationOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/incognito/$id"))
+
+    /** The incognito chat's model choice, primed in memory — there is no session record. */
+    suspend fun chooseIncognito(id: String, model: String?, reasoning: String?) =
+        post<JsonObject>("/api/incognito/$id", kotlinx.serialization.json.buildJsonObject {
+            model?.let { put("model", kotlinx.serialization.json.JsonPrimitive(it)) }
+            put("reasoning", reasoning?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+        }.toString())
+
+    /** A file for an incognito message: read as text, never stored. */
+    suspend fun attachIncognito(file: PendingUpload) = attach("/api/incognito/attach", file)
+
+    suspend fun sendIncognito(id: String, text: String, images: List<PendingUpload> = emptyList()) =
+        post<JsonObject>("/api/agents/incognito/$id", admissionBody(text, images))
+
+    /** What the web's composer Stop calls for an incognito chat: aborts the reply. */
+    suspend fun abortIncognito(id: String) = post<JsonObject>("/api/agents/incognito/$id/abort")
+
+    /** Ends an incognito chat: aborts its reply and purges everything it kept in memory. */
+    suspend fun closeIncognito(id: String) = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url("/api/incognito/$id")).withAuth().delete().build()
+        http.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) throw ApiError(res.code, res.body?.string().orEmpty())
+        }
+    }
+
     /** What the web's composer Stop calls: stops the reply, keeps the sandbox. */
     suspend fun abortSession(id: String) = post<JsonObject>("/api/agents/coder/$id/abort")
 

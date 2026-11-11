@@ -10,11 +10,22 @@ import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import java.util.UUID
+
+/** Where a finished creation lands: a task's thread, or the throwaway incognito chat. */
+data class Completed(val id: String, val incognito: Boolean)
 
 /** A two-phase creation owned by the VM, so closing/recreating the sheet cannot lose a draft. */
 class TaskCreation(scope: CoroutineScope? = null) {
+    companion object {
+        /** The repo picker's incognito choice — a sentinel that never leaves the device. */
+        const val INCOGNITO = "__incognito__"
+    }
+
     val draft = MessageDraft(scope)
     var projectId by mutableStateOf<String?>(null)
+    val incognito get() = projectId == INCOGNITO
+    private var incoId: String? = null
     var branch by mutableStateOf<String?>(null)
     var model by mutableStateOf<String?>(null)
     var reasoning by mutableStateOf<String?>(null)
@@ -89,11 +100,27 @@ class TaskCreation(scope: CoroutineScope? = null) {
         if (succeeded) completedId = sessionId
     }
 
+    /**
+     * An incognito chat has no create step: the id is made on the device and the
+     * first admitted message is what brings the conversation to life. A failed
+     * send keeps the id, so Retry continues the same chat rather than starting another.
+     */
+    suspend fun startIncognito(send: suspend (String, String, OutgoingDraft) -> Unit) {
+        if (completedId != null || discarding || draft.sending || draft.attachments.reading) return
+        discardConfirmation = false
+        discardError = null
+        val id = incoId ?: "inco_${UUID.randomUUID()}".also { incoId = it }
+        val succeeded = draft.deliver { text, outgoing -> send(id, text, outgoing) }
+        if (succeeded) completedId = id
+    }
+
     /** Navigation consumes a success once; failures never publish a navigation destination. */
-    fun consumeCompleted(): String? {
+    fun consumeCompleted(): Completed? {
         val id = completedId ?: return null
+        val wasIncognito = incognito
         completedId = null
         sessionId = null
+        incoId = null
         discardConfirmation = false
         discardError = null
         initialized = false
@@ -101,6 +128,6 @@ class TaskCreation(scope: CoroutineScope? = null) {
         branch = null
         model = null
         reasoning = null
-        return id
+        return Completed(id, wasIncognito)
     }
 }
