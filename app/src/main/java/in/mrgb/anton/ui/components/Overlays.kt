@@ -47,6 +47,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 /* ── Dropdown / popover (shadcn DropdownMenuContent / PopoverContent) ── */
@@ -75,9 +76,9 @@ private class AnchoredPosition(
 }
 
 /**
- * The web's dropdown/popover surface: `bg-popover` (overlay), 8dp radius,
- * `ring-1 ring-foreground/10`, `shadow-md`, `p-1`, and the 100ms
- * fade + zoom-from-95% entrance. Place it in a Box with its trigger.
+ * The web's dropdown/popover surface: `bg-overlay`, an 8dp radius, the strong
+ * hairline and `sh-2` shadow, `p-1`, and the 100ms fade + zoom-from-95%
+ * entrance. Place it in a Box with its trigger.
  */
 @Composable
 fun AntonDropdown(
@@ -122,7 +123,7 @@ fun DropdownSurface(
     scrollable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     Column(
         modifier
             .then(if (width != null) Modifier.width(width) else Modifier.widthIn(min = minWidth, max = 300.dp).width(IntrinsicSize.Max))
@@ -138,8 +139,8 @@ fun DropdownSurface(
 }
 
 /**
- * shadcn DropdownMenuItem / SelectItem: 6dp radius, hover wash on press,
- * optional leading icon, trailing check for the selected value.
+ * shadcn DropdownMenuItem / SelectItem: a 4dp radius, the active wash on the
+ * chosen row, optional leading icon, trailing check for the selected value.
  */
 @Composable
 fun MenuItem(
@@ -156,8 +157,8 @@ fun MenuItem(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 38.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (checked) Anton.Hover else Color.Transparent)
+            .clip(RoundedCornerShape(Radius.Inner))
+            .background(if (checked) Anton.Pressed else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -184,8 +185,8 @@ fun MenuItem(
 @Composable
 fun MenuLabel(text: String, count: Int? = null) {
     Row(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text.uppercase(), style = Type.MonoLabel.copy(fontSize = 11.sp), color = Anton.TextDisabled)
-        count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
+        Text(text, style = Type.SmallMedium, color = Anton.TextTertiary)
+        count?.let { Text("·$it", style = Type.Micro, color = Anton.TextQuaternary) }
     }
 }
 
@@ -250,8 +251,9 @@ fun <T> AntonSelect(
 /* ── Sheet (shadcn Sheet side="bottom" / Drawer) ── */
 
 /**
- * The bottom sheet every picker and form uses: raised surface, 16dp top
- * radius, hairline edge, slim handle, 60% black scrim, optional title row.
+ * The bottom sheet every picker and form uses: the overlay surface, a 12dp
+ * top radius like Aura's dialogs, hairline edge, slim handle, scrim, optional
+ * title row.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -261,18 +263,18 @@ fun AntonSheet(
     subtitle: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+    val shape = RoundedCornerShape(topStart = Radius.Dialog, topEnd = Radius.Dialog)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = shape,
-        containerColor = Anton.Raised,
+        containerColor = Anton.Overlay,
         contentColor = Anton.TextPrimary,
         tonalElevation = 0.dp,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
+        scrimColor = Color.Black.copy(alpha = 0.5f),
         modifier = Modifier.border(1.dp, Anton.BorderSubtle, shape),
         dragHandle = {
-            Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp).clip(CircleShape).background(Anton.N600))
+            Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp).clip(CircleShape).background(Anton.N500))
         },
     ) {
         Column(Modifier.fillMaxWidth()) {

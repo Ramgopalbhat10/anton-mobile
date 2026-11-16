@@ -119,7 +119,7 @@ private fun App() {
                 error = vm.error.collectAsState().value,
                 onRefresh = vm::refresh,
                 onOpen = { push(Screen.Project(it)) },
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
         is Screen.Project -> {
@@ -194,7 +194,7 @@ private fun App() {
                 sessions = vm.sessions.collectAsState().value,
                 onRefresh = vm::refresh,
                 onOpen = { push(Screen.Thread(it)) },
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
         is Screen.Settings -> {
@@ -210,7 +210,7 @@ private fun App() {
                 onServer = vm::setServer,
                 onToggleNeedsYou = vm::setNeedsYou, onToggleFinished = vm::setFinished,
                 onToggleWorking = vm::setWorking, onTogglePlanFirst = vm::setPlanFirst,
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
     }
@@ -250,8 +250,9 @@ private fun ActivityScreen(
     onOpen: (String) -> Unit,
     tabIndex: Int,
     onNav: (Int) -> Unit,
+    onNew: () -> Unit = {},
 ) {
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar("Activity")
         val recent = sessions.sortedByDescending { it.resolvedAt ?: it.pinnedAt ?: it.createdAt }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -263,7 +264,7 @@ private fun ActivityScreen(
                 }
             }
         }
-        BottomBar(tabIndex, onNav)
+        BottomBar(tabIndex, onNav, onNew)
     }
 }
 

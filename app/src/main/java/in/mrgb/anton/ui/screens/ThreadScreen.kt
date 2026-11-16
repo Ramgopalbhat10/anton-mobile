@@ -38,6 +38,7 @@ import `in`.mrgb.anton.data.api.placeJoined
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 import kotlinx.serialization.json.JsonPrimitive
@@ -72,7 +73,7 @@ fun ThreadScreen(
     var menu by remember { mutableStateOf(false) }
     var showDiffs by remember(initialShowDiffs) { mutableStateOf(initialShowDiffs) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         Row(
             Modifier.fillMaxWidth().hairlineBottom().heightIn(min = 56.dp).padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -210,7 +211,7 @@ internal fun mdType(small: Boolean = false): com.mikepenz.markdown.model.Markdow
 
 @Composable
 fun UserMessage(m: MessageDto) {
-    val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
+    val shape = RoundedCornerShape(12.dp, 12.dp, 4.dp, 12.dp)
     // Attached files show as chips; the text they carry is the agent's to read.
     val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
     val images = Attachments.inlineImages(m.parts, split.files)
@@ -319,7 +320,7 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
     AntonCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(7.dp)),
+                Modifier.size(24.dp).clip(RoundedCornerShape(Radius.Control)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -373,7 +374,7 @@ private fun AskCard(p: PartDto) {
     AntonCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 12.dp, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
+                Modifier.size(22.dp).clip(RoundedCornerShape(Radius.Control)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f)) {
@@ -388,7 +389,7 @@ private fun AskCard(p: PartDto) {
             Column(Modifier.padding(horizontal = 10.dp).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 p.options.forEachIndexed { i, opt ->
                     val on = i == picked
-                    val shape = RoundedCornerShape(9.dp)
+                    val shape = RoundedCornerShape(Radius.Card)
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(shape)
                             .background(if (on) Anton.AccentBg else Color.Transparent)
@@ -430,7 +431,7 @@ private fun AskCard(p: PartDto) {
 @Composable
 private fun QueuedNote(text: String) {
     Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
+        val shape = RoundedCornerShape(12.dp, 12.dp, 4.dp, 12.dp)
         Box(
             Modifier.clip(shape).border(1.dp, Anton.BorderDefault, shape).padding(horizontal = 15.dp, vertical = 11.dp),
         ) { Text(text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }

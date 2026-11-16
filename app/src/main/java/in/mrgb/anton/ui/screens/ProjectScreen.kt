@@ -21,6 +21,7 @@ import `in`.mrgb.anton.data.api.SpaceDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 
@@ -36,8 +37,8 @@ private fun SpaceDto.countsLine(): String {
 
 /** Projects tab root: the list of spaces. */
 @Composable
-fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit, onOpen: (String) -> Unit, tabIndex: Int, onNav: (Int) -> Unit) {
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit, onOpen: (String) -> Unit, tabIndex: Int, onNav: (Int) -> Unit, onNew: () -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar("Projects")
         if (spaces.isEmpty() && error != null) {
             ErrorNotice("Can't reach the server. ${error.take(120)}", Modifier.padding(horizontal = Space.Gutter, vertical = 10.dp))
@@ -48,12 +49,12 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
             items(spaces, key = { it.id }) { space ->
                 val live = (space.counts["working"] ?: 0) > 0
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpen(space.id) }.padding(horizontal = 12.dp, vertical = 13.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.Card)).clickable { onOpen(space.id) }.padding(horizontal = 12.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
-                        Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(Anton.CardGradient).border(1.dp, Anton.CardBorder, RoundedCornerShape(9.dp)),
+                        Modifier.size(34.dp).clip(RoundedCornerShape(Radius.Control)).background(Anton.Surface).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(Radius.Control)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (space.icon.isNotBlank() && space.icon.length <= 4) Text(space.icon, style = Type.Body)
@@ -75,7 +76,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
         }
         }
         }
-        BottomBar(tabIndex, onNav)
+        BottomBar(tabIndex, onNav, onNew)
     }
 }
 
@@ -83,7 +84,7 @@ fun ProjectsScreen(spaces: List<SpaceDto>, error: String?, onRefresh: () -> Unit
 @Composable
 fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () -> Unit, onOpenThread: (String) -> Unit, onOpenCoordinator: (String) -> Unit) {
     val openFeed = { onOpenCoordinator(space?.name ?: "Project") }
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar(
             space?.name?.ifBlank { "Project" } ?: "Project",
             subtitle = space?.let { s -> listOfNotNull(s.repoIds.size.takeIf { it > 0 }?.let { "$it repos" }, s.countsLine()).joinToString(" · ") },
@@ -97,7 +98,7 @@ fun ProjectDetailScreen(space: SpaceDto?, threads: List<SessionDto>, onBack: () 
                 AntonCard(Modifier.fillMaxWidth().padding(horizontal = Space.Gutter).clickable(onClick = openFeed)) {
                     Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
+                            Modifier.size(24.dp).clip(RoundedCornerShape(Radius.Control)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(Radius.Control)),
                             contentAlignment = Alignment.Center,
                         ) { Icon(Lucide.Sparkles, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
                         Column(Modifier.weight(1f)) {

@@ -54,6 +54,7 @@ import `in`.mrgb.anton.ui.screens.mdPadding
 import `in`.mrgb.anton.ui.screens.mdType
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 import com.mikepenz.markdown.m3.Markdown
 import kotlinx.coroutines.Dispatchers
@@ -352,7 +353,7 @@ private fun toast(context: Context, text: String) = Toast.makeText(context, text
 fun FileChip(name: String, note: String?, imageUrl: String? = null, modifier: Modifier = Modifier, onOpen: (() -> Unit)? = null) {
     val viewer = LocalViewer.current
     val open = onOpen ?: if (imageUrl != null && viewer != null) { { viewer(listOf(Artifact(name, imageUrl, Artifact.Kind.Image)), 0) } } else null
-    val shape = RoundedCornerShape(9.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     Row(
         modifier.widthIn(max = 260.dp).clip(shape).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, shape)
             .then(if (open != null) Modifier.clickable { open() } else Modifier)
@@ -395,7 +396,7 @@ fun SentAttachments(files: List<Attachments.Ref>, modifier: Modifier = Modifier)
 @Composable
 fun ImageCard(url: String, name: String, modifier: Modifier = Modifier, height: Dp = 150.dp, caption: Boolean = true) {
     val viewer = LocalViewer.current
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     Column(
         modifier.width(IntrinsicSize.Max).widthIn(max = 280.dp).clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)
             .then(if (viewer != null) Modifier.clickable { viewer(listOf(Artifact(name, url, Artifact.Kind.Image)), 0) } else Modifier),

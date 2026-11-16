@@ -44,6 +44,7 @@ import `in`.mrgb.anton.data.api.field
 import `in`.mrgb.anton.data.api.outputText
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -272,7 +273,7 @@ fun WorkCard(
     val lastText = parts.indexOfLast { it.type == "text" }
     val agents = steps.filter { it.name == "task" }
     val chevron by animateFloatAsState(if (open) 180f else 0f, tween(180), label = "chev")
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)) {
         Row(
             Modifier.fillMaxWidth().clickable { open = !open }.heightIn(min = 44.dp).padding(start = 14.dp, end = 14.dp),
@@ -411,10 +412,10 @@ private fun ToolStep(p: PartDto) {
             val command = if (name == "run_script") p.input.field("code").trim() else "$ ${p.input.field("command")}"
             val out = if (p.state == "output-available") p.output.outputText().trimEnd() else ""
             val text = command + if (out.isNotEmpty()) "\n" + out.lines().takeLast(40).joinToString("\n") else ""
-            val shape = RoundedCornerShape(8.dp)
+            val shape = RoundedCornerShape(Radius.Control)
             Box(
                 Modifier.padding(start = 30.dp, top = 2.dp, bottom = 6.dp).fillMaxWidth().heightIn(max = 220.dp)
-                    .clip(shape).background(Anton.WellBg).border(1.dp, Anton.WellBorder, shape)
+                    .clip(shape).background(Anton.WellBg)
                     .verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) { Text(text, style = Type.Code.copy(fontSize = 12.sp, lineHeight = 18.sp), color = Anton.TextSecondary, softWrap = false) }
@@ -463,10 +464,10 @@ private fun AgentStep(p: PartDto) {
             }
         }
         if (open) {
-            val shape = RoundedCornerShape(9.dp)
+            val shape = RoundedCornerShape(Radius.Control)
             Column(
                 Modifier.padding(top = 2.dp, bottom = 6.dp).fillMaxWidth().clip(shape)
-                    .background(Anton.WellBg).border(1.dp, Anton.WellBorder, shape).padding(horizontal = 10.dp, vertical = 8.dp),
+                    .background(Anton.WellBg).padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 val steps = run?.steps.orEmpty()

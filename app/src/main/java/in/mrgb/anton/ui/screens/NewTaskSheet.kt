@@ -28,6 +28,7 @@ import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 import `in`.mrgb.anton.vm.TaskCreation
 
@@ -78,8 +79,8 @@ fun NewTaskSheet(
             Text("Task created. Retry sends to the same task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
             AntonButton("Start a separate task instead", state::startOver, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = !busy)
         }
-        val shape = RoundedCornerShape(14.dp)
-        Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
+        val shape = RoundedCornerShape(Radius.Dialog)
+        Column(Modifier.fillMaxWidth().clip(shape).background(Anton.Surface).border(1.dp, border, shape)) {
             AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
             BasicTextField(
                 value = prompt, onValueChange = state.draft::edit, enabled = !busy,
@@ -163,7 +164,7 @@ fun NewTaskSheet(
                 }
                 AntonSwitch(planFirst, onPlanFirst, enabled = !locked)
                 Box(
-                    Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+                    Modifier.size(32.dp).clip(RoundedCornerShape(Radius.Control))
                         .background(if (canStart) Anton.Accent else Anton.N750)
                         .clickable(enabled = canStart, role = Role.Button, onClick = onStart),
                     contentAlignment = Alignment.Center,

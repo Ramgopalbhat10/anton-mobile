@@ -35,10 +35,11 @@ fun SettingsScreen(
     onTogglePlanFirst: (Boolean) -> Unit,
     tabIndex: Int,
     onNav: (Int) -> Unit,
+    onNew: () -> Unit = {},
 ) {
     var editing by remember { mutableStateOf(false) }
     val host = baseUrl.removePrefix("https://").removePrefix("http://").trimEnd('/')
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar("Settings")
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -87,7 +88,7 @@ fun SettingsScreen(
             )
         }
         }
-        BottomBar(tabIndex, onNav)
+        BottomBar(tabIndex, onNav, onNew)
     }
     if (editing) {
         ServerSheet(baseUrl, cfId, cfSecret, onSave = { u, i, s -> onServer(u, i, s); editing = false }, onDismiss = { editing = false })
