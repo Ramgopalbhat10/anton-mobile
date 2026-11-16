@@ -2,8 +2,6 @@ package `in`.mrgb.anton.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -31,6 +28,7 @@ import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 
@@ -119,7 +117,7 @@ fun TasksScreen(
     var searching by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(searching) { if (searching) runCatching { focus.requestFocus() } }
-    Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Box(Modifier.fillMaxSize().background(Anton.Panel)) {
         Column(Modifier.fillMaxSize()) {
             AppBar("Tasks") {
                 GhostIconButton(Lucide.Search, "Search", tint = if (searching) Anton.TextPrimary else Anton.IconTertiary) {
@@ -176,9 +174,8 @@ fun TasksScreen(
             }
             }
             }
-            BottomBar(tabIndex, onNav)
+            BottomBar(tabIndex, onNav, onNew)
         }
-        Fab(onNew, Modifier.align(Alignment.BottomEnd).padding(end = Space.Gutter, bottom = 82.dp))
     }
 }
 
@@ -191,7 +188,7 @@ fun TaskRow(s: SessionDto, onOpen: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.Card))
             .clickable { onOpen(s.id) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -249,43 +246,40 @@ private fun Fact(icon: ImageVector?, text: String, mono: Boolean = false, modifi
     }
 }
 
+/**
+ * Aura's phone bar: the panel's top hairline, icon-over-label stops, the
+ * chosen place in full text colour, and a raised accent button in the middle
+ * that starts something — the spec's New, which opens the new-task sheet.
+ */
 @Composable
-fun Fab(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Box(
-        modifier
-            .size(48.dp)
-            .shadow(14.dp, RoundedCornerShape(14.dp), ambientColor = Anton.Accent, spotColor = Anton.Accent)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (pressed) Anton.AccentPressed else Anton.Accent)
-            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(Lucide.Plus, "New task", tint = Anton.AccentFg, modifier = Modifier.size(22.dp)) }
+fun BottomBar(selected: Int, onNav: (Int) -> Unit, onNew: () -> Unit = {}) {
+    val left = listOf(Triple("Tasks", Lucide.ListTodo, 0), Triple("Projects", Lucide.Folder, 1))
+    val right = listOf(Triple("Activity", Lucide.History, 2), Triple("Settings", Lucide.Settings, 3))
+    Row(
+        Modifier.fillMaxWidth().background(Anton.Panel).hairlineTop().padding(start = 6.dp, top = 4.dp, end = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        left.forEach { (label, icon, i) -> BarItem(label, icon, i == selected) { onNav(i) } }
+        Spacer(Modifier.weight(1f))
+        Box(
+            Modifier.size(46.dp).clip(CircleShape).background(Anton.Accent)
+                .clickable(role = Role.Button, onClick = onNew),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Lucide.Plus, "New task", tint = Anton.AccentFg, modifier = Modifier.size(22.dp)) }
+        Spacer(Modifier.weight(1f))
+        right.forEach { (label, icon, i) -> BarItem(label, icon, i == selected) { onNav(i) } }
+    }
 }
 
-/** Icon-only tab bar; the selected tab gets the accent and a short accent rule above it. */
 @Composable
-fun BottomBar(selected: Int, onNav: (Int) -> Unit) {
-    val items = listOf(
-        Triple("Tasks", Lucide.ListTodo, 0),
-        Triple("Projects", Lucide.Folder, 1),
-        Triple("Activity", Lucide.History, 2),
-        Triple("Settings", Lucide.Settings, 3),
-    )
-    Row(
-        Modifier.fillMaxWidth().background(Anton.Canvas).hairlineTop().padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 6.dp),
+private fun BarItem(label: String, icon: ImageVector, on: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.width(64.dp).height(48.dp).clip(RoundedCornerShape(Radius.Control)).clickable(role = Role.Tab, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
     ) {
-        items.forEach { (label, icon, i) ->
-            val on = i == selected
-            Box(
-                Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Tab) { onNav(i) },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (on) Box(Modifier.align(Alignment.TopCenter).padding(top = 0.dp).size(width = 18.dp, height = 2.dp).clip(RoundedCornerShape(1.dp)).background(Anton.Accent))
-                Icon(icon, label, tint = if (on) Anton.Accent else Anton.IconDisabled, modifier = Modifier.size(22.dp))
-            }
-        }
+        Icon(icon, null, tint = if (on) Anton.TextPrimary else Anton.TextTertiary, modifier = Modifier.size(20.dp))
+        Text(label, style = Type.Micro, color = if (on) Anton.TextPrimary else Anton.TextTertiary, maxLines = 1)
     }
 }
 

@@ -27,6 +27,7 @@ import `in`.mrgb.anton.data.api.*
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 /** What a creation card can do besides opening its thread. */
@@ -58,9 +59,9 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
     val context = LocalContext.current
     val openWeb = { url: String -> openArtifactLink(context, url) }
     val open = { id?.let(onOpen); Unit }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(Radius.Dialog)
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, Anton.CardBorder, shape)
+        Modifier.fillMaxWidth().clip(shape).background(Anton.CardBg).border(1.dp, Anton.CardBorder, shape)
             .clickable(enabled = id != null, role = Role.Button, onClickLabel = "Open thread", onClick = open)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -114,7 +115,7 @@ internal fun CoordinatorCreationCard(entry: CoordinatorEntry, onOpen: (String) -
 
 @Composable
 private fun CardControl(text: String, icon: ImageVector, color: Color = Anton.TextSecondary, enabled: Boolean = true, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     Row(
         Modifier.widthIn(max = 240.dp).heightIn(min = 26.dp).clip(shape).background(Anton.Hover).border(1.dp, Anton.BorderDefault, shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 7.dp, vertical = 3.dp),

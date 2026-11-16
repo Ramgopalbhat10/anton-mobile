@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -42,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 /** Caps list/thread content on wide screens (tablets); headers and footers stay full-width. */
@@ -174,20 +175,20 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCheck(
 
 /* ── Surfaces ── */
 
-/** instrument.css `.in-card`: 14dp radius, hairline border, top-lit gradient, 1px inner highlight. */
+/** Aura's `.in-card`: an 8dp corner, the surface fill, a 1px hairline inside the edge. */
 @Composable
 fun AntonCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     Column(
         modifier
             .clip(shape)
-            .background(Anton.CardGradient)
-            .drawBehind { drawRect(Anton.CardHighlight, Offset(14.dp.toPx(), 0f), Size(size.width - 28.dp.toPx(), 1.dp.toPx())) }
+            .background(Anton.CardBg)
             .border(1.dp, Anton.CardBorder, shape),
         content = content,
     )
 }
 
+/** Aura's `.in-well`: a quiet inset, no edge, for code, tool output, a group of values. */
 @Composable
 fun AntonWell(
     modifier: Modifier = Modifier,
@@ -196,8 +197,7 @@ fun AntonWell(
 ) {
     Row(
         modifier
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, Anton.WellBorder, RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.Control))
             .background(Anton.WellBg)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 11.dp),
@@ -224,24 +224,23 @@ fun <T> Segmented(
 ) {
     Row(
         modifier
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))
-            .background(Anton.WellBg)
+            .clip(RoundedCornerShape(Radius.Control))
+            .background(Anton.Raised)
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEach { (value, label) ->
             val on = value == selected
-            val shape = RoundedCornerShape(7.dp)
+            // The chosen option is a raised key in the well: overlay fill, strong hairline, a whisper of shadow.
+            val shape = RoundedCornerShape(Radius.Inner)
             Row(
                 Modifier
                     .height(32.dp)
                     .clip(shape)
                     .then(
                         if (on) Modifier
-                            .background(Brush.verticalGradient(listOf(Anton.N750, Anton.N800)))
-                            .drawBehind { drawRect(Anton.CardHighlight, Offset.Zero, Size(size.width, 1.dp.toPx())) }
-                            .border(1.dp, Anton.CardBorder, shape)
+                            .background(Anton.Overlay)
+                            .border(1.dp, Anton.BorderDefault, shape)
                         else Modifier,
                     )
                     .clickable(role = Role.Tab) { onSelect(value) }
@@ -260,11 +259,12 @@ fun <T> Segmented(
 
 /* ── Labels ── */
 
+/** Aura's group label: sentence case, small and medium, one step under body text. */
 @Composable
 fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 6.dp)) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text.uppercase(), style = Type.MonoLabel, color = Anton.TextDisabled)
-        count?.let { Text("·$it", style = Type.MonoLabel, color = Anton.N600) }
+        Text(text, style = Type.SmallMedium, color = Anton.TextTertiary)
+        count?.let { Text("·$it", style = Type.Micro, color = Anton.TextQuaternary) }
     }
 }
 
@@ -280,12 +280,12 @@ fun Badge(text: String, tone: Tone = Tone.Neutral, mono: Boolean = false) {
         Tone.Warning -> Triple(Anton.WarningText, Anton.WarningBg, Anton.WarningBorder)
         Tone.Danger -> Triple(Anton.DangerText, Anton.DangerBg, Anton.DangerBorder)
     }
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(Radius.Inner)
     Box(
-        Modifier.height(22.dp).clip(shape).background(bg).border(1.dp, bd, shape).padding(horizontal = 7.dp),
+        Modifier.height(20.dp).clip(shape).background(bg).border(1.dp, bd, shape).padding(horizontal = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = if (mono) Type.Num.copy(fontSize = 11.5.sp) else Type.SmallMedium.copy(fontSize = 12.sp), color = fg, maxLines = 1)
+        Text(text, style = if (mono) Type.Num.copy(fontSize = 11.sp) else Type.Micro.copy(fontWeight = FontWeight.Medium), color = fg, maxLines = 1)
     }
 }
 
@@ -309,14 +309,14 @@ fun AntonButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val (bg, fg, border) = when (variant) {
-        ButtonVariant.Primary -> Triple(if (pressed) Anton.AccentPressed else Anton.Accent, Anton.AccentFg, Color.Transparent)
+        ButtonVariant.Primary -> Triple(if (pressed) Anton.AccentHover else Anton.Accent, Anton.AccentFg, Color.Transparent)
         ButtonVariant.Outline -> Triple(if (pressed) Anton.Pressed else Anton.InputBg, Anton.TextPrimary, Anton.Input)
-        ButtonVariant.Secondary -> Triple(if (pressed) Anton.N700 else Anton.N750, Anton.TextPrimary, Anton.BorderSubtle)
+        ButtonVariant.Secondary -> Triple(if (pressed) Anton.Overlay else Anton.Raised, Anton.TextPrimary, Anton.BorderDefault)
         ButtonVariant.Ghost -> Triple(if (pressed) Anton.Pressed else Color.Transparent, Anton.TextSecondary, Color.Transparent)
         ButtonVariant.Destructive -> Triple(if (pressed) Anton.DangerBorder else Anton.DangerBg, Anton.DangerText, Anton.DangerBorder)
     }
     val animBg by animateColorAsState(bg, tween(90), label = "btn")
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     Row(
         modifier
             .height(size.height)
@@ -346,7 +346,7 @@ fun GhostIconButton(
     onClick: () -> Unit = {},
 ) {
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(8.dp)).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        Modifier.size(size).clip(RoundedCornerShape(Radius.Control)).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, label, tint = tint, modifier = Modifier.size(iconSize)) }
 }
@@ -374,10 +374,12 @@ fun AntonInput(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
-    val borderColor by animateColorAsState(if (focused) Anton.Accent.copy(alpha = 0.7f) else Anton.Input, tween(120), label = "inputBorder")
+    // Aura's field: a raised fill with a strong hairline; focus turns the edge
+    // to the accent line and adds a soft accent ring outside it.
+    val borderColor by animateColorAsState(if (focused) Anton.AccentBorder else Anton.Input, tween(120), label = "inputBorder")
     val ring by animateDpAsState(if (focused) 3.dp else 0.dp, tween(120), label = "ring")
     val style: TextStyle = (if (mono) Type.Code else Type.Body.copy(fontSize = 15.sp, lineHeight = 21.sp)).copy(color = Anton.TextPrimary)
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -396,8 +398,8 @@ fun AntonInput(
                         if (ring > 0.dp) {
                             val r = ring.toPx()
                             drawRoundRect(
-                                Anton.Accent.copy(alpha = 0.16f), Offset(-r, -r), Size(size.width + 2 * r, size.height + 2 * r),
-                                CornerRadius(8.dp.toPx() + r),
+                                Anton.AccentBg, Offset(-r, -r), Size(size.width + 2 * r, size.height + 2 * r),
+                                CornerRadius(Radius.Control.toPx() + r),
                             )
                         }
                     }
@@ -453,13 +455,13 @@ fun SelectChip(
     trailing: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
 ) {
-    val shape = RoundedCornerShape(7.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     Row(
         modifier
             .height(32.dp)
             .clip(shape)
             .background(if (open) Anton.Pressed else Anton.InputBg)
-            .border(1.dp, if (open) Anton.Accent.copy(alpha = 0.55f) else Anton.Input, shape)
+            .border(1.dp, if (open) Anton.AccentBorder else Anton.Input, shape)
             .clickable(enabled = enabled, role = Role.DropdownList, onClick = onClick)
             .padding(start = 8.dp, end = if (chevron) 6.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -532,7 +534,7 @@ fun ListRow(
     ) {
         icon?.let {
             Box(
-                Modifier.size(28.dp).clip(RoundedCornerShape(7.dp)).background(Anton.Hover).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(7.dp)),
+                Modifier.size(28.dp).clip(RoundedCornerShape(Radius.Control)).background(Anton.Hover).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Icon(it, null, tint = Anton.IconSecondary, modifier = Modifier.size(15.dp)) }
         }
@@ -554,7 +556,7 @@ fun ListRow(
 
 @Composable
 fun ErrorNotice(text: String, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     Row(
         modifier.fillMaxWidth().clip(shape).background(Anton.DangerBg).border(1.dp, Anton.DangerBorder, shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -574,7 +576,7 @@ fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifie
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp)),
+            Modifier.size(40.dp).clip(RoundedCornerShape(Radius.Card)).background(Anton.Raised).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(Radius.Card)),
             contentAlignment = Alignment.Center,
         ) { Icon(icon, null, tint = Anton.IconTertiary, modifier = Modifier.size(20.dp)) }
         Spacer(Modifier.height(4.dp))
@@ -620,12 +622,13 @@ fun AntonComposer(
     val focusManager = LocalFocusManager.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border by animateColorAsState(if (focused) Anton.BorderStrong else Anton.CardBorder, tween(120), label = "composer")
-    val shape = RoundedCornerShape(14.dp)
+    // Aura's composer: the one surface with a 12px corner; focus turns its edge to the accent.
+    val border by animateColorAsState(if (focused) Anton.AccentBorder else Anton.BorderDefault, tween(120), label = "composer")
+    val shape = RoundedCornerShape(Radius.Dialog)
     val blind = atts.images.isNotEmpty() && !seesImages
     val canSend = (text.isNotBlank() || atts.count > 0) && !busy && !atts.reading && !blind
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape),
+        Modifier.fillMaxWidth().clip(shape).background(Anton.Surface).border(1.dp, border, shape),
     ) {
         AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
         BasicTextField(
@@ -679,9 +682,9 @@ fun AntonComposer(
                 else -> Anton.Accent
             }
             Box(
-                Modifier.size(34.dp).clip(RoundedCornerShape(8.dp))
+                Modifier.size(34.dp).clip(CircleShape)
                     .background(bg)
-                    .border(1.dp, if (working) Anton.DangerBorder else Color.Transparent, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (working) Anton.DangerBorder else Color.Transparent, CircleShape)
                     .clickable(sendInteraction, indication = null, enabled = working || canSend, role = Role.Button) {
                         if (working) onStop() else if (canSend) { onSend(text, atts.snapshot()); focusManager.clearFocus() }
                     },

@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -28,6 +27,7 @@ import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Logos
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 /**
@@ -360,7 +360,7 @@ private fun InitialTile(name: String, size: androidx.compose.ui.unit.Dp) {
 
 @Composable
 private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = null, check: Boolean = false, leading: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.Control)
     Row(
         Modifier.height(32.dp).clip(shape)
             .background(if (on) Anton.AccentBg else Anton.InputBg)
@@ -381,14 +381,14 @@ private fun Pill(label: String, count: Int?, on: Boolean, icon: ImageVector? = n
 @Composable
 private fun ModelRow(m: ModelDto, on: Boolean, current: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.Control))
             .background(if (on) Anton.AccentBg else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val tile = RoundedCornerShape(8.dp)
+        val tile = RoundedCornerShape(Radius.Control)
         Box(Modifier.size(32.dp).clip(tile).background(Anton.Overlay).border(1.dp, Anton.BorderSubtle, tile), contentAlignment = Alignment.Center) {
             ModelLogo(m.id, m.vendor, 16.dp)
             if (m.subscription != null) PlanDot(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp))
@@ -424,7 +424,7 @@ private fun OptionsPanel(
 ) {
     Column(
         Modifier.fillMaxWidth().hairlineTop(Anton.BorderDefault)
-            .background(Brush.verticalGradient(listOf(Anton.Overlay, Anton.Raised)))
+            .background(Anton.Raised)
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -473,16 +473,15 @@ private fun OptionRow(label: String, icon: ImageVector, content: @Composable () 
 @Composable
 private fun <T> Segments(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, default: T? = null, markDefault: Boolean = default != null) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))
-            .background(Anton.WellBg).padding(3.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.Control)).background(Anton.Raised).padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEach { (value, label) ->
             val on = value == selected
-            val shape = RoundedCornerShape(7.dp)
+            val shape = RoundedCornerShape(Radius.Inner)
             Box(
                 Modifier.weight(1f).height(34.dp).clip(shape)
-                    .then(if (on) Modifier.background(Brush.verticalGradient(listOf(Anton.N700, Anton.N750))).border(1.dp, Anton.BorderDefault, shape) else Modifier)
+                    .then(if (on) Modifier.background(Anton.Overlay).border(1.dp, Anton.BorderDefault, shape) else Modifier)
                     .clickable(role = Role.Tab) { onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) {

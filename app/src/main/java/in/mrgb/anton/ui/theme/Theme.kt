@@ -14,7 +14,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DelegatableNode
@@ -25,121 +24,145 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import `in`.mrgb.anton.R
 import kotlinx.coroutines.launch
 
 /**
- * Anton's palette, verbatim from src/web/styles/signal-tokens.css + instrument.css,
- * plus the shadcn aliases the web maps onto them in src/web/styles.css
- * (popover = bg-overlay, input = border-default, ring = accent-ring, radius = 8px).
- * The app is dark-only.
+ * Anton's palette is Aura's dark theme (anton-v2 `styles/aura-tokens.css`):
+ * cool zinc neutrals, hairlines for structure, one indigo accent that means
+ * an action or live agent work, and state hues that never borrow the accent.
+ * The app is dark-only; `[data-theme='light']` on the web is the peer theme.
  */
 object Anton {
+    /* Neutrals: Aura's --n-* scale, coolest first. */
     val N1000 = Color(0xFF000000)
-    val N950 = Color(0xFF0A0A0B)
-    val N900 = Color(0xFF101012)
-    val N850 = Color(0xFF16161A)
-    val N800 = Color(0xFF1C1C21)
-    val N750 = Color(0xFF23232A)
-    val N700 = Color(0xFF2C2C34)
-    val N600 = Color(0xFF3A3A43)
-    val N500 = Color(0xFF4A4A52)
-    val N400 = Color(0xFF6E6E78)
-    val N300 = Color(0xFFA0A0A8)
-    val N200 = Color(0xFFC8C8CE)
-    val N100 = Color(0xFFEDEDEF)
+    val N950 = Color(0xFF070708)
+    val N900 = Color(0xFF0A0A0B)
+    val N850 = Color(0xFF0D0D0F)
+    val N800 = Color(0xFF111113)
+    val N750 = Color(0xFF151518)
+    val N700 = Color(0xFF19191C)
+    val N600 = Color(0xFF1E1E22)
+    val N500 = Color(0xFF26262B)
+    val N400 = Color(0xFF34343A)
+    val N300 = Color(0xFF52525B)
+    val N200 = Color(0xFF71717A)
+    val N100 = Color(0xFFA1A1AA)
+    val N50 = Color(0xFFD4D4D8)
+    val N0 = Color(0xFFEDEDEF)
 
-    val Canvas = N950
-    val Surface = N900
-    val Raised = N850
-    val Overlay = N800
+    /* Surfaces: each layer steps forward gently. Hover and active are
+       translucent overlays, so they hold on any layer.
+       Canvas  --bg-app     the window
+       Panel   --bg-panel   the content area screens sit on
+       Surface --bg-surface cards and wells
+       Raised  --bg-raised  inputs, cards on cards
+       Overlay --bg-overlay menus, popovers, dialogs */
+    val Canvas = N900
+    val Panel = N850
+    val Surface = N800
+    val Raised = N750
+    val Overlay = N700
     val Inset = N1000
-    val Hover = Color(0x0AFFFFFF)
-    val Pressed = Color(0x12FFFFFF)
+    val Hover = Color(0x0BFFFFFF) // --bg-hover
+    val Pressed = Color(0x13FFFFFF) // --bg-active
+    val Track = N400 // --track: the off part of a switch
 
-    val BorderSubtle = Color(0x0FFFFFFF)
-    val BorderDefault = Color(0x17FFFFFF)
-    val BorderStrong = Color(0x24FFFFFF)
-    val CardBorder = Color(0x12FFFFFF)
-    val CardBg = Color(0xFF121212)
-    val CardBgTop = Color(0xFF161616)
-    val CardHighlight = Color(0x0AFFFFFF)
-    val WellBg = Color(0xFF0C0C0C)
-    val WellBorder = Color(0x0DFFFFFF)
+    /* Lines: default for structure, strong for controls. */
+    val BorderSubtle = Color(0x12FFFFFF) // --line
+    val BorderDefault = Color(0x1CFFFFFF) // --line-strong
+    val BorderStrong = Color(0x29FFFFFF)
+    val CardBorder = Color(0x12FFFFFF) // in-card's inset hairline is --line
+    val CardBg = Surface
+    val CardHighlight = Color.Transparent
+    val WellBg = Hover
+    val WellBorder = Color(0x0FFFFFFF)
 
     /* shadcn aliases (src/web/styles.css) */
     val Popover = Overlay
-    val PopoverRing = Color(0x1AFFFFFF) // ring-foreground/10
+    val PopoverRing = BorderDefault
     val Input = BorderDefault // border-input
-    val InputBg = Color(0x07FFFFFF) // dark:bg-input/30
-    val Ring = Color(0x4D3FB6D8) // --accent-ring (cyan 30%)
+    val InputBg = Raised // a field's fill is --bg-raised
+    val Ring = Color(0x66FFFFFF) // unused legacy; focus ring is AccentRing
+    val AccentRing = Color(0x8A8EFF) // --focus's ring colour (--a-400)
 
-    val TextPrimary = N100
-    val TextSecondary = N300
-    val TextTertiary = N400
-    val TextDisabled = N500
-    val IconSecondary = N300
-    val IconTertiary = N400
-    val IconDisabled = N500
+    val TextPrimary = N0
+    val TextSecondary = N100
+    val TextTertiary = N200
+    val TextDisabled = N300
+    val TextQuaternary = N500
+    val IconSecondary = N100
+    val IconTertiary = N200
+    val IconDisabled = N300
 
-    val Accent = Color(0xFF3FB6D8)
-    val AccentHover = Color(0xFF6FD1EC)
-    val AccentPressed = Color(0xFF2A9DBF)
-    val AccentFg = Color(0xFF06181F)
-    val AccentBg = Color(0x1F3FB6D8)
-    val AccentBorder = Color(0x663FB6D8)
+    /* Accent: --accent is --a-500; hover --a-400; text on it is white. */
+    val Accent = Color(0xFF6E72F7)
+    val AccentHover = Color(0xFF8A8EFF)
+    val AccentPressed = Color(0xFF5A5DE0)
+    val AccentFg = Color(0xFFFFFFFF)
+    val AccentBg = Color(0x246E72F7) // --accent-soft
+    val AccentBorder = Color(0x616E72F7) // --accent-line
 
-    val Success = Color(0xFF35C88A)
-    val SuccessText = Color(0xFF63DDA5)
-    val SuccessBg = Color(0x1A35C88A)
-    val SuccessBorder = Color(0x4D35C88A)
+    /* States: --ok/--warn/--bad/--merged/--conflict/--info, each with its soft fill and line. */
+    val Success = Color(0xFF3DD68C)
+    val SuccessText = Color(0xFF3DD68C)
+    val SuccessBg = Color(0x1F3DD68C)
+    val SuccessBorder = Color(0x4D3DD68C)
 
-    val Warning = Color(0xFFE3A63F)
-    val WarningText = Color(0xFFF2C173)
-    val WarningBg = Color(0x1AE3A63F)
-    val WarningBorder = Color(0x4DE3A63F)
+    val Warning = Color(0xFFF5B544)
+    val WarningText = Color(0xFFF5B544)
+    val WarningBg = Color(0x1FF5B544)
+    val WarningBorder = Color(0x4DF5B544)
 
-    val Danger = Color(0xFFE5544F)
-    val DangerText = Color(0xFFF09B97)
-    val DangerBg = Color(0x1AE5544F)
-    val DangerBorder = Color(0x4DE5544F)
+    val Danger = Color(0xFFF2555A)
+    val DangerText = Color(0xFFF2555A)
+    val DangerBg = Color(0x1FF2555A)
+    val DangerBorder = Color(0x4DF2555A)
 
-    /* Data tones (instrument.css --data-1…5): commands, edits, browser, PRs, subagents. */
-    val Data1 = Color(0xFF3FB6D8)
-    val Data2 = Color(0xFFA78BFA)
-    val Data3 = Color(0xFFE3A63F)
-    val Data4 = Color(0xFF35C88A)
-    val Data5 = Color(0xFFF472B6)
+    val Merged = Color(0xFFB58CFF)
+    val MergedBg = Color(0x21B58CFF)
+    val MergedBorder = Color(0x4DB58CFF)
 
-    /** in-card's vertical gradient. */
-    val CardGradient = Brush.verticalGradient(listOf(CardBgTop, CardBg))
+    val Conflict = Color(0xFFFF8A4C)
+    val Info = Color(0xFF5AB8FF)
+    val InfoBg = Color(0x1F5AB8FF)
+    val InfoBorder = Color(0x4D5AB8FF)
+
+    /* Data tones (chart series order): indigo leads, so one series reads as Anton's. */
+    val Data1 = Color(0xFF6E72F7)
+    val Data2 = Color(0xFFD4D4D8)
+    val Data3 = Color(0xFF4547B8)
+    val Data4 = Color(0xFF71717A)
+    val Data5 = Color(0xFFC7C9FF)
+    val Data6 = Color(0xFF52525B)
+
 }
 
-/* ── Geist, the web's typeface (variable TTFs, Latin subset, ~110 KB together) ── */
+/* ── Inter and JetBrains Mono, Aura's typefaces (variable TTFs, Latin subset, ~320 KB) ── */
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-private fun geist(res: Int, weight: FontWeight) =
+private fun face(res: Int, weight: FontWeight) =
     Font(res, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
 
-val GeistSans = FontFamily(
-    geist(R.font.geist, FontWeight.Normal),
-    geist(R.font.geist, FontWeight.Medium),
-    geist(R.font.geist, FontWeight.SemiBold),
-    geist(R.font.geist, FontWeight.Bold),
+val InterSans = FontFamily(
+    face(R.font.inter, FontWeight.Normal),
+    face(R.font.inter, FontWeight.Medium),
+    face(R.font.inter, FontWeight.SemiBold),
+    face(R.font.inter, FontWeight.Bold),
 )
 
-val GeistMono = FontFamily(
-    geist(R.font.geist_mono, FontWeight.Normal),
-    geist(R.font.geist_mono, FontWeight.Medium),
-    geist(R.font.geist_mono, FontWeight.SemiBold),
+val JetBrainsMono = FontFamily(
+    face(R.font.jetbrains_mono, FontWeight.Normal),
+    face(R.font.jetbrains_mono, FontWeight.Medium),
+    face(R.font.jetbrains_mono, FontWeight.Bold),
 )
 
 private val scheme = darkColorScheme(
     primary = Anton.Accent,
     onPrimary = Anton.AccentFg,
-    secondary = Anton.N800,
+    secondary = Anton.Raised,
     onSecondary = Anton.TextPrimary,
     background = Anton.Canvas,
     onBackground = Anton.TextPrimary,
@@ -157,10 +180,6 @@ private val scheme = darkColorScheme(
     onError = Anton.AccentFg,
 )
 
-/**
- * Anton's type scale (signal-tokens.css): body 14.5/21, small 13.5/19, meta 12.5/19,
- * titles 18 semibold; mono labels 11.5 uppercase tracking .08em. All Geist.
- */
 /**
  * Spacing scale (dp). Everything sits on a 2/4dp grid; the named roles are
  * what screens reach for so the rhythm stays the same app-wide.
@@ -181,22 +200,40 @@ object Space {
     val Turn = 20.dp
 }
 
+/** Aura's corner steps: mark 3, inner 4, control 6, card 8, dialog 12. */
+object Radius {
+    val Mark = 3.dp
+    val Inner = 4.dp
+    val Control = 6.dp
+    val Card = 8.dp
+    val Dialog = 12.dp
+}
+
+/**
+ * Aura's type scale, a step up for a handset: the web's 13px body reads
+ * small on a phone, so the app keeps the hierarchy and adds ~1.5–2sp.
+ * Inter for the interface, JetBrains Mono for what the agent reads and
+ * writes. Three weights: 400 reading, 500 actions and labels, 600 hierarchy.
+ */
 object Type {
-    private val base = TextStyle(fontFamily = GeistSans)
-    private val mono = TextStyle(fontFamily = GeistMono)
-    val Title = base.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp)
+    private val base = TextStyle(fontFamily = InterSans)
+    private val mono = TextStyle(fontFamily = JetBrainsMono)
+    val Display = base.copy(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.4).sp)
+    val Title = base.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp)
     val Heading = base.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp)
-    val Body = base.copy(fontSize = 14.5.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
-    val BodyMedium = base.copy(fontSize = 14.5.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
-    val BodyLarge = base.copy(fontSize = 15.5.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
-    val Meta = base.copy(fontSize = 12.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
-    val Small = base.copy(fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
-    val SmallMedium = base.copy(fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
+    val H3 = base.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+    val BodyLarge = base.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
+    val Body = base.copy(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal)
+    val BodyMedium = base.copy(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
+    val Small = base.copy(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
+    val SmallMedium = base.copy(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
+    val Meta = base.copy(fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal)
+    val Micro = base.copy(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
     val MonoLabel = mono.copy(
-        fontSize = 11.5.sp,
-        lineHeight = 18.sp,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
         fontWeight = FontWeight.Medium,
-        letterSpacing = 0.84.sp,
+        letterSpacing = 0.6.sp,
     )
     val Num = mono.copy(fontSize = 12.sp, lineHeight = 18.sp)
     val Code = mono.copy(fontSize = 13.sp, lineHeight = 20.sp)
@@ -204,15 +241,15 @@ object Type {
 
 private val typography = Typography().let { t ->
     Typography(
-        bodyLarge = t.bodyLarge.copy(fontFamily = GeistSans),
-        bodyMedium = t.bodyMedium.copy(fontFamily = GeistSans),
-        bodySmall = t.bodySmall.copy(fontFamily = GeistSans),
-        labelLarge = t.labelLarge.copy(fontFamily = GeistSans),
-        labelMedium = t.labelMedium.copy(fontFamily = GeistSans),
-        labelSmall = t.labelSmall.copy(fontFamily = GeistSans),
-        titleLarge = t.titleLarge.copy(fontFamily = GeistSans),
-        titleMedium = t.titleMedium.copy(fontFamily = GeistSans),
-        titleSmall = t.titleSmall.copy(fontFamily = GeistSans),
+        bodyLarge = t.bodyLarge.copy(fontFamily = InterSans),
+        bodyMedium = t.bodyMedium.copy(fontFamily = InterSans),
+        bodySmall = t.bodySmall.copy(fontFamily = InterSans),
+        labelLarge = t.labelLarge.copy(fontFamily = InterSans),
+        labelMedium = t.labelMedium.copy(fontFamily = InterSans),
+        labelSmall = t.labelSmall.copy(fontFamily = InterSans),
+        titleLarge = t.titleLarge.copy(fontFamily = InterSans),
+        titleMedium = t.titleMedium.copy(fontFamily = InterSans),
+        titleSmall = t.titleSmall.copy(fontFamily = InterSans),
     )
 }
 
@@ -244,7 +281,7 @@ object PressHighlight : IndicationNodeFactory {
 
         override fun ContentDrawScope.draw() {
             drawContent()
-            if (alpha.value > 0f) drawRect(Color.White.copy(alpha = 0.06f * alpha.value))
+            if (alpha.value > 0f) drawRect(Color.White.copy(alpha = 0.07f * alpha.value))
         }
     }
 }

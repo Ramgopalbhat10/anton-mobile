@@ -25,6 +25,7 @@ import `in`.mrgb.anton.data.api.*
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 /** Creation follows the live session; a report describes the historical event, not today's reply. */
@@ -122,7 +123,7 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
         CoordinatorCreationCard(entry, onOpen)
         return
     }
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.Card)
     val statusColor = when (entry.glyph) {
         GlyphKind.Idle, GlyphKind.Resolved, GlyphKind.Queued -> Anton.TextSecondary
         GlyphKind.Failed -> Anton.DangerText
@@ -146,8 +147,8 @@ internal fun CoordinatorEntryView(entry: CoordinatorEntry, expanded: Boolean, on
         if (expanded) {
             val open = { entry.threadId?.let(onOpen); Unit }
             Column(
-                Modifier.padding(start = 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(Anton.WellBg).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(10.dp))
+                Modifier.padding(start = 12.dp).fillMaxWidth().clip(RoundedCornerShape(Radius.Card))
+                    .background(Anton.WellBg).border(1.dp, Anton.BorderSubtle, RoundedCornerShape(Radius.Card))
                     .clickable(enabled = entry.threadId != null, role = Role.Button, onClickLabel = "Open thread", onClick = open)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
