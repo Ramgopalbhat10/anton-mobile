@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.putJsonArray
+import okhttp3.Cache
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -13,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** Static config the api client reads on every call — Settings edits take effect immediately. */
@@ -30,11 +32,16 @@ data class ServerConfig(
         }
 }
 
-class AntonApi(private val config: () -> ServerConfig) {
+/**
+ * [cacheDir], when given, keeps an HTTP cache there: the server tags its JSON reads, so reading something unchanged
+ * again is an empty 304 that the cache answers from its copy. Nothing is taken from it without asking the server.
+ */
+class AntonApi(cacheDir: File? = null, private val config: () -> ServerConfig) {
 
     val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     val http = OkHttpClient.Builder()
+        .apply { cacheDir?.let { cache(Cache(it, HTTP_CACHE_BYTES)) } }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         // Network interceptors run for every exchange, including each redirect hop.
@@ -54,8 +61,12 @@ class AntonApi(private val config: () -> ServerConfig) {
         }
         .build()
 
-    /** SSE needs no read timeout — the stream lives as long as the screen does. */
-    val sseHttp = http.newBuilder().readTimeout(0, TimeUnit.SECONDS).build()
+    /**
+     * The event stream lives as long as the app does, but the server writes a heartbeat every 25 s, so a minute of
+     * silence means the connection died without saying so: it is dropped and opened again, which reads everything
+     * again. The stream is never cached.
+     */
+    val sseHttp = http.newBuilder().cache(null).readTimeout(SSE_SILENCE_SECONDS, TimeUnit.SECONDS).build()
 
     /** Snapshot credentials for this call; the per-hop origin check attaches them on the wire. */
     private fun Request.Builder.withAuth(c: ServerConfig = config()): Request.Builder =
@@ -92,6 +103,9 @@ class AntonApi(private val config: () -> ServerConfig) {
         catch (e: Exception) { throw ApiError(0, "$path: ${e.message}") }
     }
 
+    /** Any JSON read, for callers that parse it themselves. */
+    suspend fun getJson(path: String): kotlinx.serialization.json.JsonElement = get(path)
+
     suspend fun sessions() = get<SessionsResponse>("/api/mobile/sessions").sessions
 
     suspend fun sessionBundle(id: String) = get<SessionBundleDto>("/api/mobile/sessions/$id")
@@ -117,17 +131,30 @@ class AntonApi(private val config: () -> ServerConfig) {
      * A project's coordinator conversation, from the same public agent router the
      * web hits, flattened by [Transcript].
      */
-    suspend fun spaceMessages(spaceId: String): List<MessageDto> =
-        Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coordinator/$spaceId"))
+    suspend fun spaceMessages(spaceId: String, window: ConversationWindow? = null): List<MessageDto> =
+        if (window != null) runCatching { window.read(::getJson).messages }.getOrElse { e ->
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            spaceMessages(spaceId)
+        }
+        else Transcript.messagesOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coordinator/$spaceId"))
 
     /**
      * A task's conversation as the web reads it (flue's own shape, with tool
      * call ids, errors, reply durations and its settlements); the facade's
      * trimmed copy when the agent router can't be reached.
      */
-    suspend fun threadConversation(id: String): ConversationDto =
-        runCatching { Transcript.conversationOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
+    suspend fun threadConversation(id: String, window: ConversationWindow? = null): ConversationDto {
+        // Its latest turns when the screen keeps a window; the whole conversation if that read fails.
+        if (window != null) {
+            val read = runCatching { window.read(::getJson) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull()
+            // An empty window is an empty conversation: only the facade's copy is left to try.
+            if (read != null) return read.takeIf { it.messages.isNotEmpty() } ?: ConversationDto(messages(id))
+        }
+        return runCatching { Transcript.conversationOf(get<kotlinx.serialization.json.JsonElement>("/api/agents/coder/$id")) }
             .getOrNull()?.takeIf { it.messages.isNotEmpty() } ?: ConversationDto(messages(id))
+    }
 
     /** Where the agent read each message sent while it worked, so the thread can show it there. */
     suspend fun sessionJoins(id: String): List<JoinDto> = get<JoinsResponse>("/api/sessions/$id/joins").joins
@@ -253,5 +280,10 @@ class AntonApi(private val config: () -> ServerConfig) {
 /** A web origin includes the scheme and effective port, not just a hostname prefix. */
 internal fun HttpUrl.sameOrigin(other: HttpUrl): Boolean =
     scheme == other.scheme && host == other.host && port == other.port
+
+/** Room for the tagged reads the app asks again: lists, conversation windows, images. */
+internal const val HTTP_CACHE_BYTES = 20L * 1024 * 1024
+/** Over twice the server's 25 s heartbeat. */
+internal const val SSE_SILENCE_SECONDS = 60L
 
 class ApiError(val status: Int, body: String) : Exception("HTTP $status: ${body.take(160)}")

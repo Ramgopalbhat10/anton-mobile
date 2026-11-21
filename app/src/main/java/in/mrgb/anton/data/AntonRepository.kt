@@ -4,6 +4,7 @@ import `in`.mrgb.anton.data.api.AntonApi
 import `in`.mrgb.anton.data.api.AttachedFileDto
 import `in`.mrgb.anton.data.api.Attachments
 import `in`.mrgb.anton.data.api.ConversationDto
+import `in`.mrgb.anton.data.api.ConversationWindow
 import `in`.mrgb.anton.data.api.EventsStream
 import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.PendingUpload
@@ -11,7 +12,15 @@ import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDetailDto
 import `in`.mrgb.anton.data.api.SpaceDto
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -28,26 +37,45 @@ import kotlinx.coroutines.isActive
  */
 class AntonRepository(val api: AntonApi, changeEvents: Flow<EventsStream.Event.Change>? = null) {
 
-    /** Any server change, as named by /api/events. Restarts with backoff when the stream drops. */
+    /** Keeps the one event stream open while any screen listens; never cancelled, as the repository lives as long as the app. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _live = MutableStateFlow(false)
+
+    /**
+     * Whether the event stream is open now. While it is, screens hear of every change and poll only as a slow safety
+     * net; the stream notices a dead connection within a minute ([AntonApi.sseHttp]), and then they poll as before.
+     */
+    val live: StateFlow<Boolean> = _live.asStateFlow()
+
+    /**
+     * Any server change, as named by /api/events. Restarts with backoff when the stream drops. One connection is
+     * shared by every screen listening, instead of one each.
+     */
     val changes: Flow<EventsStream.Event.Change> = changeEvents ?: flow {
-        while (currentCoroutineContext().isActive) {
-            EventsStream.stream(api).catch { /* Retry both errors and clean EOF. */ }.collect { event ->
-                when (event) {
-                    // Reconnecting is an invalidation too: changes may have been missed offline.
-                    EventsStream.Event.Open -> emit(EventsStream.Event.Change("sessions", null))
-                    is EventsStream.Event.Change -> emit(event)
-                    else -> Unit
+        try {
+            while (currentCoroutineContext().isActive) {
+                EventsStream.stream(api).catch { /* Retry both errors and clean EOF. */ }.collect { event ->
+                    when (event) {
+                        // Reconnecting is an invalidation too: changes may have been missed offline.
+                        EventsStream.Event.Open -> { _live.value = true; emit(EventsStream.Event.Change("sessions", null)) }
+                        is EventsStream.Event.Change -> emit(event)
+                        else -> Unit
+                    }
                 }
+                _live.value = false
+                delay(3_000)
             }
-            delay(3_000)
+        } finally {
+            _live.value = false
         }
-    }
+    }.shareIn(scope, SharingStarted.WhileSubscribed(5_000))
 
     suspend fun sessions(): List<SessionDto> = api.sessions()
 
     suspend fun session(id: String): SessionBundleDto = api.sessionBundle(id)
 
-    suspend fun conversation(id: String): ConversationDto = api.threadConversation(id)
+    suspend fun conversation(id: String, window: ConversationWindow? = null): ConversationDto = api.threadConversation(id, window)
 
     suspend fun messages(id: String) = conversation(id).messages
 

@@ -68,6 +68,8 @@ fun ThreadScreen(
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
     initialShowDiffs: Boolean = false,
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
 ) {
     val s = bundle?.session
     var menu by remember { mutableStateOf(false) }
@@ -115,8 +117,9 @@ fun ThreadScreen(
         val answeredBy = remember(settlements) { settlements.associate { it.submissionId to it.answeredBySubmissionId } }
         // Messages sent while the agent worked move into the reply it was writing, where it read them.
         val rows = remember(messages, joins, answeredBy, liveReply) { placeJoined(messages, joins, answeredBy, liveReply) }
-        // Keep the tail of the transcript visible as messages arrive and stream in.
-        val tailSize = rows.size + rows.lastOrNull().let { r -> r?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
+        // Keep the tail of the transcript visible as messages arrive and stream in; earlier turns going in above don't move it.
+        val tailSize = rows.lastOrNull().let { r -> Triple(r?.key, r?.parts?.size ?: 0, r?.parts?.sumOf { it.text?.length ?: 0 } ?: 0) }
+        val rowKeys = remember(rows) { rows.map { it.key.ifBlank { it.message.hashCode().toString() } } }
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(
@@ -151,6 +154,7 @@ fun ThreadScreen(
                 }
             }
             }
+            EarlierMessages(listState, older, rowKeys, onLoadOlder)
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.contentWidth()) {

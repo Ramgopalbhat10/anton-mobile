@@ -162,6 +162,8 @@ private fun App() {
                 onSend = { text, draft -> vm.sendCoordinator(s.id, text, draft) },
                 onAnswer = { vm.answerCoordinator(s.id, it) },
                 onBack = { back.removeAt(back.lastIndex) },
+                older = vm.coordinatorOlder.collectAsState().value,
+                onLoadOlder = { vm.loadOlderCoordinator(s.id) },
             )
         }
         is Screen.Thread -> {
@@ -186,6 +188,8 @@ private fun App() {
                 onStop = vm::stop,
                 onModel = vm::setModel,
                 onLoadModels = vm::loadModels,
+                older = vm.older.collectAsState().value,
+                onLoadOlder = { vm.loadOlder() },
             )
         }
         is Screen.Activity -> {
