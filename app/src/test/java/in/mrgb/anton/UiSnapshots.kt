@@ -109,6 +109,8 @@ private val models = listOf(
     ModelDto("deepseek/deepseek-v4.1-pro", "DeepSeek V4.1 Pro", "deepseek", "deepseek", contextLength = 128_000),
     ModelDto("xai/grok-4.7", "Grok 4.7", "xai", "xai", contextLength = 500_000),
     ModelDto("openai/gpt-6.1-sol", "GPT-6.1 Sol", "openai", "openai", contextLength = 400_000),
+    ModelDto("devin/swe-2", "SWE-2", "devin", "Devin", contextLength = 262_000, subscription = "Devin"),
+    ModelDto("antigravity/gemini-4-neon", "Gemini 4 Neon", "antigravity", "Antigravity", contextLength = 1_048_576, subscription = "Antigravity"),
 )
 
 private val threadMessages = listOf(
