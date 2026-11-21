@@ -41,13 +41,15 @@ fun CoordinatorScreen(
     cardActions: Map<String, ThreadCardAction> = emptyMap(),
     onStopThread: ((String) -> Unit)? = null,
     onReviewThread: ((String) -> Unit)? = null,
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId),
                 LocalCoordinatorCards provides CoordinatorCardHost(cardActions, onStopThread, onReviewThread)) {
-            key(spaceId) { CoordinatorTimeline(messages, threads, threadsLoaded, onOpenThread) }
+            key(spaceId) { CoordinatorTimeline(messages, threads, threadsLoaded, onOpenThread, older = older, onLoadOlder = onLoadOlder) }
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -78,8 +80,13 @@ internal fun CoordinatorTimeline(
     threadsLoaded: Boolean = false,
     onOpenThread: (String) -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
 ) {
-    LaunchedEffect(messages) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
+    // Follows the newest message as it arrives and is written; earlier turns going in above don't move it.
+    LaunchedEffect(messages.lastOrNull(), messages.isEmpty()) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
+    val keys = remember(messages) { messages.map<MessageDto, Any> { it.id.ifBlank { it.hashCode().toString() } } }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
         if (messages.isEmpty()) {
             item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
@@ -89,5 +96,7 @@ internal fun CoordinatorTimeline(
         }
         // Scrolling to this lands at the very end, even below a tall last message.
         item(key = "coordinator-tail-anchor") { Spacer(Modifier.height(0.dp)) }
+    }
+    EarlierMessages(listState, older, keys, onLoadOlder)
     }
 }

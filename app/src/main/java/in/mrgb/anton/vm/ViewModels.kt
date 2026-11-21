@@ -27,13 +27,13 @@ class TasksViewModel(private val repo: AntonRepository) : ViewModel() {
 
     init {
         refresh()
-        // SSE invalidation: a `sessions` change refetches the list. Poll on top so
-        // a dead stream can't leave the app stale.
+        // SSE invalidation: a `sessions` change, or a task's state, PR or settlement changing, refetches the list.
+        // Poll on top so a dead stream can't leave the app stale; slowly while the stream is up.
         viewModelScope.launch {
-            repo.changes.collect { e -> if (e.name == "sessions") refresh() }
+            repo.changes.collect { e -> if (e.name == "sessions" || (e.name == "task" && e.what in LIST_WHATS)) refresh() }
         }
         viewModelScope.launch {
-            while (true) { kotlinx.coroutines.delay(15_000); refresh() }
+            while (true) { kotlinx.coroutines.delay(if (repo.live.value) SAFETY_NET_MS else 15_000); refresh() }
         }
     }
 
@@ -64,6 +64,11 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val error = MutableStateFlow<String?>(null)
     /** The task's reasoning level, which the facade's session row leaves out. */
     val reasoning = MutableStateFlow<String?>(null)
+    /** Its latest turns, and the earlier ones read as you scroll up. */
+    private val window = ConversationWindow("/api/agents/coder/$sessionId")
+    val older = window.older
+    /** One read of the conversation at a time, so an earlier read never lands over a page read after it. */
+    private val conversationLock = Mutex()
 
     init {
         refresh()
@@ -72,24 +77,46 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         loadModels()
         viewModelScope.launch {
             repo.changes.collect { e ->
-                if (e.name.startsWith("task") && e.data?.contains(sessionId) == true) refresh()
-                if (e.name == "sessions") refresh()
+                if (e.name.startsWith("task") && (e.id == sessionId || e.data?.contains(sessionId) == true)) {
+                    // Its files changed (each write while it works): only the diff can have moved.
+                    if (e.what == "files") refreshDiffs() else refresh(diffs = e.what == null || e.what == "state")
+                }
+                if (e.name == "sessions") refresh(diffs = false)
             }
         }
-        // SSE can drop silently behind proxies; poll while the thread is open.
+        // The reply is read as it is written while the agent works; SSE can also drop silently behind proxies.
+        // While the stream is up and the agent is idle, every change arrives as an event, so this is a slow safety net.
         viewModelScope.launch {
-            while (true) { kotlinx.coroutines.delay(4_000); refresh() }
+            while (true) {
+                val live = repo.live.value
+                kotlinx.coroutines.delay(if (live && _bundle.value?.session?.working != true) SAFETY_NET_MS else 4_000)
+                // A stream that is up sends `files` for every change to the diff.
+                refresh(diffs = !repo.live.value)
+            }
         }
     }
 
-    fun refresh() = viewModelScope.launch {
+    /** Reads the page of turns before the earliest one shown. */
+    fun loadOlder() = viewModelScope.launch {
+        conversationLock.withLock {
+            window.loadOlder(repo.api::getJson)?.let { _messages.value = it.messages; _settlements.value = it.settlements }
+        }
+    }
+
+    private fun refreshDiffs() = viewModelScope.launch {
+        runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
+    }
+
+    fun refresh(diffs: Boolean = true) = viewModelScope.launch {
         runCatching { repo.session(sessionId) }.onSuccess { _bundle.value = it }.onFailure { error.value = it.message }
-        runCatching { repo.conversation(sessionId) }.onSuccess { _messages.value = it.messages; _settlements.value = it.settlements }
+        conversationLock.withLock {
+            runCatching { repo.conversation(sessionId, window) }.onSuccess { _messages.value = it.messages; _settlements.value = it.settlements }
+        }
         // Only a message that joined another reply, or one sent while the agent works, can need moving.
         val joined = _settlements.value.any { it.answeredBySubmissionId != null && it.answeredBySubmissionId != it.submissionId }
         if (joined || _bundle.value?.session?.working == true) runCatching { repo.joins(sessionId) }.onSuccess { _joins.value = it }
         else _joins.value = emptyList()
-        runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
+        if (diffs) runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
     }
 
     fun loadModels() = viewModelScope.launch {
@@ -137,6 +164,10 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     private var reloads: Channel<Unit>? = null
     private val transcriptLock = Mutex()
     private var transcriptChangedAt = 0L
+    /** The open project's coordinator conversation: its latest turns, and earlier ones read as you scroll up. */
+    private var coordinatorWindow: ConversationWindow? = null
+    val coordinatorOlder = MutableStateFlow(ConversationWindow.Older())
+    private var olderWatch: Job? = null
 
     init { refresh() }
 
@@ -177,6 +208,10 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             _threads.value = emptyList()
             threadsLoaded.value = false
             coordinatorMessages.value = emptyList()
+            olderWatch?.cancel()
+            coordinatorWindow = ConversationWindow("/api/agents/coordinator/$id").also { w ->
+                olderWatch = viewModelScope.launch { w.older.collect { coordinatorOlder.value = it } }
+            }
             coordinatorModel.value = null
             coordinatorReasoning.value = null
         }
@@ -193,12 +228,12 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
             }
             // The event stream doesn't carry the coordinator's reply as it's written, so poll
             // just its transcript while a reply is in flight. A full reload every 16s covers
-            // an event stream that dropped without telling us.
+            // an event stream that dropped without telling us; every minute or so while it is up.
             launch {
                 var tick = 0
                 while (true) {
                     delay(2_000)
-                    if (++tick % 8 == 0) signals.trySend(Unit)
+                    if (++tick % (if (repo.live.value) 32 else 8) == 0) signals.trySend(Unit)
                     else if (coordinatorReplying()) quietly { loadTranscript(id) }
                 }
             }
@@ -215,7 +250,7 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     }
 
     private suspend fun loadTranscript(id: String) = transcriptLock.withLock {
-        val messages = repo.api.spaceMessages(id)
+        val messages = repo.api.spaceMessages(id, coordinatorWindow.takeIf { activeSpace == id })
         if (activeSpace == id && messages != coordinatorMessages.value) {
             coordinatorMessages.value = messages
             transcriptChangedAt = System.currentTimeMillis()
@@ -242,6 +277,15 @@ class ProjectsViewModel(private val repo: AntonRepository) : ViewModel() {
     } catch (e: Exception) {
         error.value = e.message
         false
+    }
+
+    /** Reads the page of the coordinator's turns before the earliest one shown. */
+    fun loadOlderCoordinator(id: String) = viewModelScope.launch {
+        val window = coordinatorWindow.takeIf { activeSpace == id } ?: return@launch
+        transcriptLock.withLock {
+            val conversation = window.loadOlder(repo.api::getJson) ?: return@withLock
+            if (activeSpace == id && coordinatorWindow === window) coordinatorMessages.value = conversation.messages
+        }
     }
 
     fun stopCoordinatorThread(threadId: String) = viewModelScope.launch {
@@ -325,3 +369,9 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
         creation.start(planFirst.value, repo.api::createSession) { id, text, outgoing -> repo.send(id, text, outgoing, creation.draft.uploads) }
     }
 }
+
+/** How often a screen reads again while the event stream is up and nothing is under way: a safety net. */
+internal const val SAFETY_NET_MS = 60_000L
+
+/** Task changes that show in the task list: its state and reply, its pull request, a settled message. */
+private val LIST_WHATS = setOf("state", "pr-metadata", "settled")
