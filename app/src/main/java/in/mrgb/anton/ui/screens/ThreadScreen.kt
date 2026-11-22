@@ -34,6 +34,7 @@ import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SettlementDto
+import `in`.mrgb.anton.data.api.TodoDto
 import `in`.mrgb.anton.data.api.placeJoined
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
@@ -59,6 +60,7 @@ fun ThreadScreen(
     webUrl: String,
     joins: List<JoinDto> = emptyList(),
     settlements: List<SettlementDto> = emptyList(),
+    todos: List<TodoDto> = emptyList(),
     onBack: () -> Unit,
     onSend: (String, OutgoingDraft) -> Unit,
     onAbort: () -> Unit,
@@ -161,6 +163,7 @@ fun ThreadScreen(
                 Composer(
                     working = s?.working == true,
                     sending = sending,
+                    todos = todos,
                     draft = draft,
                     onSend = onSend,
                     onStop = onAbort,
@@ -449,6 +452,7 @@ private fun QueuedNote(text: String) {
 @Composable
 private fun Composer(
     working: Boolean, sending: Boolean,
+    todos: List<TodoDto>,
     onSend: (String, OutgoingDraft) -> Unit, onStop: () -> Unit,
     model: String, reasoning: String?, models: List<ModelDto>,
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
@@ -456,6 +460,7 @@ private fun Composer(
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 12.dp)) {
+        TodoPill(todos, working, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
         AntonComposer(
             placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
             working = working, sending = sending,

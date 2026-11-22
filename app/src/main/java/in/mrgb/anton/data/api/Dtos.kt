@@ -130,6 +130,17 @@ data class JoinDto(
 @Serializable
 data class JoinsResponse(val joins: List<JoinDto> = emptyList())
 
+/** One step of the agent's todo list (src/services/replies/todos.ts); [status] is pending, in_progress or completed. */
+@Serializable
+data class TodoDto(val content: String = "", val status: String = "pending", val evidence: String? = null)
+
+@Serializable
+data class TodoListDto(val todos: List<TodoDto> = emptyList(), val updatedAt: String = "")
+
+/** GET /api/sessions/:id/todos: null until the agent writes a list. */
+@Serializable
+data class TodosResponse(val list: TodoListDto? = null)
+
 /** The raw conversation: messages plus the settlements that say which reply answered each submission. */
 data class ConversationDto(
     val messages: List<MessageDto> = emptyList(),

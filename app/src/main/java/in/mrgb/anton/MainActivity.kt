@@ -181,6 +181,7 @@ private fun App() {
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 joins = vm.joins.collectAsState().value,
                 settlements = vm.settlements.collectAsState().value,
+                todos = vm.todos.collectAsState().value,
                 onBack = { back.removeAt(back.lastIndex) },
                 onSend = vm::send,
                 onAnswer = vm::answer,

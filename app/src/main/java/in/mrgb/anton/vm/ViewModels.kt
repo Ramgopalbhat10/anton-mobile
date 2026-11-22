@@ -58,6 +58,8 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
     val joins = _joins.asStateFlow()
     private val _diffs = MutableStateFlow<List<`in`.mrgb.anton.data.api.FileDiff>>(emptyList())
     val diffs = _diffs.asStateFlow()
+    private val _todos = MutableStateFlow<List<TodoDto>>(emptyList())
+    val todos = _todos.asStateFlow()
     private val _models = MutableStateFlow<List<ModelDto>>(emptyList())
     val models = _models.asStateFlow()
     val draft = MessageDraft(viewModelScope)
@@ -72,16 +74,24 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
 
     init {
         refresh()
+        refreshTodos()
         viewModelScope.launch { runCatching { repo.api.sessionReasoning(sessionId) }.onSuccess { reasoning.value = it } }
         // The composer chip names the model from the catalog, so load it up front.
         loadModels()
         viewModelScope.launch {
             repo.changes.collect { e ->
                 if (e.name.startsWith("task") && (e.id == sessionId || e.data?.contains(sessionId) == true)) {
-                    // Its files changed (each write while it works): only the diff can have moved.
-                    if (e.what == "files") refreshDiffs() else refresh(diffs = e.what == null || e.what == "state")
+                    // Its files changed (each write while it works): only the diff can have moved. Likewise its todo list.
+                    when (e.what) {
+                        "files" -> refreshDiffs()
+                        "todos" -> refreshTodos()
+                        else -> refresh(diffs = e.what == null || e.what == "state")
+                    }
                 }
-                if (e.name == "sessions") refresh(diffs = false)
+                if (e.name == "sessions") {
+                    refresh(diffs = false)
+                    refreshTodos()
+                }
             }
         }
         // The reply is read as it is written while the agent works; SSE can also drop silently behind proxies.
@@ -90,8 +100,9 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
             while (true) {
                 val live = repo.live.value
                 kotlinx.coroutines.delay(if (live && _bundle.value?.session?.working != true) SAFETY_NET_MS else 4_000)
-                // A stream that is up sends `files` for every change to the diff.
+                // A stream that is up sends `files` for every change to the diff, and `todos` for every new list.
                 refresh(diffs = !repo.live.value)
+                if (!repo.live.value) refreshTodos()
             }
         }
     }
@@ -105,6 +116,10 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
 
     private fun refreshDiffs() = viewModelScope.launch {
         runCatching { repo.sessionDiffs(sessionId) }.onSuccess { _diffs.value = it }
+    }
+
+    private fun refreshTodos() = viewModelScope.launch {
+        runCatching { repo.todos(sessionId) }.onSuccess { _todos.value = it }
     }
 
     fun refresh(diffs: Boolean = true) = viewModelScope.launch {

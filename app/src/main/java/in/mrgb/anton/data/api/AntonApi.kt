@@ -159,6 +159,9 @@ class AntonApi(cacheDir: File? = null, private val config: () -> ServerConfig) {
     /** Where the agent read each message sent while it worked, so the thread can show it there. */
     suspend fun sessionJoins(id: String): List<JoinDto> = get<JoinsResponse>("/api/sessions/$id/joins").joins
 
+    /** The agent's todo list for the task — the list the web's composer pill shows. */
+    suspend fun sessionTodos(id: String): List<TodoDto> = get<TodosResponse>("/api/sessions/$id/todos").list?.todos.orEmpty()
+
     /** The task's workspace diff as a unified patch — the same route the web's Changes tab reads. */
     suspend fun sessionChanges(id: String, branch: Boolean = false): ChangesResponse =
         get("/api/sessions/$id/changes" + if (branch) "?scope=branch" else "")
