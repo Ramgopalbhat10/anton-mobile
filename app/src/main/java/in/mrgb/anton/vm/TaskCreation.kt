@@ -8,6 +8,10 @@ import `in`.mrgb.anton.data.api.OutgoingDraft
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.ui.components.MessageDraft
 import kotlinx.coroutines.CoroutineScope
+import java.util.UUID
+
+/** Where a finished creation lands: a task's thread, or the throwaway incognito chat. */
+data class Completed(val id: String, val incognito: Boolean)
 
 /**
  * A new task's draft and choices, owned by the VM so closing the sheet can't lose them.
@@ -15,8 +19,15 @@ import kotlinx.coroutines.CoroutineScope
  * the created task is kept so Retry sends to it instead of creating another.
  */
 class TaskCreation(scope: CoroutineScope? = null) {
+    companion object {
+        /** The repo picker's incognito choice — a sentinel that never leaves the device. */
+        const val INCOGNITO = "__incognito__"
+    }
+
     val draft = MessageDraft(scope)
     var projectId by mutableStateOf<String?>(null)
+    val incognito get() = projectId == INCOGNITO
+    private var incoId: String? = null
     var branch by mutableStateOf<String?>(null)
     var model by mutableStateOf<String?>(null)
     var reasoning by mutableStateOf<String?>(null)
@@ -52,6 +63,20 @@ class TaskCreation(scope: CoroutineScope? = null) {
     }
 
     /**
+     * An incognito chat has no create step: the id is made on the device and the
+     * first admitted message is what brings the conversation to life. A failed
+     * send keeps the id, so Retry continues the same chat rather than starting another.
+     */
+    suspend fun startIncognito(send: suspend (String, String, OutgoingDraft) -> Unit) {
+        if (completedId != null || draft.sending || draft.attachments.reading) return
+        val succeeded = draft.deliver { text, outgoing ->
+            val id = incoId ?: "inco_${UUID.randomUUID()}".also { incoId = it }
+            send(id, text, outgoing)
+        }
+        if (succeeded) completedId = incoId
+    }
+
+    /**
      * Gives up on the task a failed send created (it stays in the task list) so the
      * next Start creates a new one, with choices unlocked. The prompt and files are kept.
      */
@@ -63,15 +88,17 @@ class TaskCreation(scope: CoroutineScope? = null) {
     }
 
     /** Navigation consumes a success once; failures never publish a navigation destination. */
-    fun consumeCompleted(): String? {
+    fun consumeCompleted(): Completed? {
         val id = completedId ?: return null
+        val wasIncognito = incognito
         completedId = null
         sessionId = null
+        incoId = null
         initialized = false
         projectId = null
         branch = null
         model = null
         reasoning = null
-        return id
+        return Completed(id, wasIncognito)
     }
 }

@@ -450,19 +450,20 @@ private fun QueuedNote(text: String) {
 }
 
 @Composable
-private fun Composer(
+internal fun Composer(
     working: Boolean, sending: Boolean,
     todos: List<TodoDto>,
     onSend: (String, OutgoingDraft) -> Unit, onStop: () -> Unit,
     model: String, reasoning: String?, models: List<ModelDto>,
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
     draft: MessageDraft,
+    idlePlaceholder: String = "Reply to Anton",
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 12.dp)) {
         TodoPill(todos, working, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
         AntonComposer(
-            placeholder = if (working) "Add to what the agent is doing" else "Reply to Anton",
+            placeholder = if (working) "Add to what the agent is doing" else idlePlaceholder,
             working = working, sending = sending,
             model = if (model.isBlank()) "" else Catalog.chipLabel(models, model),
             modelIcon = if (model.isBlank()) null else ({ ModelMark(Catalog.find(models, model), model, 13.dp) }),

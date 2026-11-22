@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.putJsonArray
 import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -78,9 +79,11 @@ class AntonApi(cacheDir: File? = null, private val config: () -> ServerConfig) {
     fun sseRequest(path: String): Request =
         Request.Builder().url(url(path)).withAuth().header("Accept", "text/event-stream").build()
 
-    private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
+    private suspend inline fun <reified T> get(path: String, cacheControl: CacheControl? = null): T = withContext(Dispatchers.IO) {
         try {
-            val req = Request.Builder().url(url(path)).withAuth().build()
+            val req = Request.Builder().url(url(path)).withAuth()
+                .apply { cacheControl?.let { cacheControl(it) } }
+                .build()
             http.newCall(req).execute().use { res ->
                 val text = res.body?.string().orEmpty()
                 if (!res.isSuccessful) throw ApiError(res.code, text)
@@ -224,6 +227,39 @@ class AntonApi(cacheDir: File? = null, private val config: () -> ServerConfig) {
 
     suspend fun sendMessage(sessionId: String, text: String, images: List<PendingUpload> = emptyList()) =
         post<JsonObject>("/api/agents/coder/$sessionId", admissionBody(text, images))
+
+    /**
+     * An incognito chat's conversation — the same agent router shape a task's
+     * thread reads. Never read from or write to the app's on-disk HTTP cache.
+     */
+    suspend fun incognitoConversation(id: String): ConversationDto =
+        Transcript.conversationOf(get<kotlinx.serialization.json.JsonElement>(
+            "/api/agents/incognito/$id", CacheControl.Builder().noCache().noStore().build(),
+        ))
+
+    /** The incognito chat's model choice, primed in memory — there is no session record. */
+    suspend fun chooseIncognito(id: String, model: String?, reasoning: String?) =
+        post<JsonObject>("/api/incognito/$id", kotlinx.serialization.json.buildJsonObject {
+            model?.let { put("model", kotlinx.serialization.json.JsonPrimitive(it)) }
+            put("reasoning", reasoning?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+        }.toString())
+
+    /** A file for an incognito message: read as text, never stored. */
+    suspend fun attachIncognito(file: PendingUpload) = attach("/api/incognito/attach", file)
+
+    suspend fun sendIncognito(id: String, text: String, images: List<PendingUpload> = emptyList()) =
+        post<JsonObject>("/api/agents/incognito/$id", admissionBody(text, images))
+
+    /** What the web's composer Stop calls for an incognito chat: aborts the reply. */
+    suspend fun abortIncognito(id: String) = post<JsonObject>("/api/agents/incognito/$id/abort")
+
+    /** Ends an incognito chat: aborts its reply and purges everything it kept in memory. */
+    suspend fun closeIncognito(id: String) = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url("/api/incognito/$id")).withAuth().delete().build()
+        http.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) throw ApiError(res.code, res.body?.string().orEmpty())
+        }
+    }
 
     /** What the web's composer Stop calls: stops the reply, keeps the sandbox. */
     suspend fun abortSession(id: String) = post<JsonObject>("/api/agents/coder/$id/abort")

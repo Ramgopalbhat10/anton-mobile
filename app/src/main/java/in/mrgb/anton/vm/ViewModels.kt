@@ -7,6 +7,9 @@ import `in`.mrgb.anton.data.SettingsStore
 import `in`.mrgb.anton.data.api.*
 import `in`.mrgb.anton.ui.screens.TasksTab
 import `in`.mrgb.anton.ui.components.MessageDraft
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -161,6 +164,88 @@ class ThreadViewModel(private val repo: AntonRepository, private val sessionId: 
         runCatching { repo.setModel(sessionId, model, level) }
             .onSuccess { _bundle.value = _bundle.value?.copy(session = it); reasoning.value = it.reasoning ?: level }
             .onFailure { error.value = it.message }
+    }
+}
+
+/**
+ * A throwaway chat: no session record exists anywhere, so there are no SSE
+ * events to ride — the transcript is polled while the screen is open, like
+ * the thread's fallback. Leaving ends it: the first admitted message is what
+ * makes there be anything to delete.
+ */
+class IncognitoViewModel(private val repo: AntonRepository, private val id: String) : ViewModel() {
+    private val _messages = MutableStateFlow<List<MessageDto>>(emptyList())
+    val messages = _messages.asStateFlow()
+    private val _settlements = MutableStateFlow<List<SettlementDto>>(emptyList())
+    val settlements = _settlements.asStateFlow()
+    private val _models = MutableStateFlow<List<ModelDto>>(emptyList())
+    val models = _models.asStateFlow()
+    val draft = MessageDraft(viewModelScope)
+    /** The pick the composer shows; primed with each send, so changes cost nothing until then. */
+    val model = MutableStateFlow<String?>(null)
+    val reasoning = MutableStateFlow<String?>(null)
+    val error = MutableStateFlow<String?>(null)
+
+    /** A delete that must outlive this VM: navigation and process teardown both land here. */
+    private val cleanup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var pollJob: Job? = null
+    private var closed = false
+
+    init {
+        refresh()
+        loadModels()
+        pollJob = viewModelScope.launch {
+            while (true) { delay(2_000); refresh() }
+        }
+    }
+
+    fun refresh() = viewModelScope.launch {
+        runCatching { repo.incognitoConversation(id) }
+            .onSuccess { _messages.value = it.messages; _settlements.value = it.settlements }
+    }
+
+    fun loadModels() = viewModelScope.launch {
+        if (_models.value.isNotEmpty()) return@launch
+        runCatching { repo.api.models() }.onSuccess { r ->
+            _models.value = r.models
+            if (model.value == null) model.value = r.default
+        }
+    }
+
+    fun setModel(model: String, level: String?) {
+        this.model.value = model
+        reasoning.value = level
+    }
+
+    fun send(text: String, outgoing: OutgoingDraft = OutgoingDraft()) = submit(text, outgoing, consumeDraft = true)
+    fun answer(text: String) = submit(text, OutgoingDraft(), consumeDraft = false)
+
+    private fun submit(text: String, outgoing: OutgoingDraft, consumeDraft: Boolean) = viewModelScope.launch {
+        draft.deliver(text, outgoing, consumeDraft) { body, files ->
+            repo.sendIncognito(id, body, files, model.value, reasoning.value)
+        }
+        refresh()
+    }
+
+    fun stop() = viewModelScope.launch {
+        runCatching { repo.abortIncognito(id) }.onFailure { error.value = it.message }
+        refresh()
+    }
+
+    /**
+     * Back, tab switch or the app closing all land here. This screen only exists
+     * because a message was already admitted, so there is always something to
+     * purge; the server treats a delete of nothing as a no-op anyway.
+     */
+    fun close() {
+        if (closed) return
+        closed = true
+        pollJob?.cancel()
+        cleanup.launch { runCatching { repo.closeIncognito(id) } }
+    }
+
+    override fun onCleared() {
+        close()
     }
 }
 
@@ -381,7 +466,15 @@ class NewTaskViewModel(private val repo: AntonRepository, private val store: Set
     fun setPlanFirst(v: Boolean) = viewModelScope.launch { store.setPlanFirst(v) }
 
     fun start() = viewModelScope.launch {
-        creation.start(planFirst.value, repo.api::createSession) { id, text, outgoing -> repo.send(id, text, outgoing, creation.draft.uploads) }
+        if (creation.incognito) {
+            creation.startIncognito { id, text, outgoing ->
+                repo.sendIncognito(id, text, outgoing, creation.model, creation.reasoning)
+            }
+        } else {
+            creation.start(planFirst.value, repo.api::createSession) { id, text, outgoing ->
+                repo.send(id, text, outgoing, creation.draft.uploads)
+            }
+        }
     }
 }
 

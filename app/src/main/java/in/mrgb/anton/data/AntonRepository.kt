@@ -121,6 +121,26 @@ class AntonRepository(val api: AntonApi, changeEvents: Flow<EventsStream.Event.C
         api.sendCoordinator(spaceId, Attachments.withAttachments(text, attached, project = true), namedByPath(outgoing, attached))
     }
 
+    /**
+     * An incognito message: the model choice is primed in memory first (best
+     * effort, like the web), files are read as text and never stored, and
+     * pictures go inline — nothing touches the disk or a session record.
+     */
+    suspend fun sendIncognito(id: String, text: String, outgoing: OutgoingDraft, model: String?, reasoning: String?) {
+        runCatching { api.chooseIncognito(id, model, reasoning) }
+        val attached = coroutineScope { outgoing.files.map { async { api.attachIncognito(it) } }.map { it.await() } }
+        val typed = text.trim().ifBlank {
+            if (outgoing.files.isEmpty() && outgoing.images.isNotEmpty()) "Look at the attached image." else ""
+        }
+        api.sendIncognito(id, Attachments.withAttachments(typed, attached, project = false), outgoing.images)
+    }
+
+    suspend fun incognitoConversation(id: String) = api.incognitoConversation(id)
+
+    suspend fun abortIncognito(id: String) = api.abortIncognito(id)
+
+    suspend fun closeIncognito(id: String) = api.closeIncognito(id)
+
     /** Images first, then files — the order [namedByPath] relies on. */
     private suspend fun upload(
         outgoing: OutgoingDraft, uploaded: MutableMap<PendingUpload, AttachedFileDto>, attach: suspend (PendingUpload) -> AttachedFileDto,

@@ -10,11 +10,36 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.nio.file.Files
 import java.util.concurrent.CopyOnWriteArrayList
 
 class HttpCacheTest {
+    @get:Rule val temporaryFolder = TemporaryFolder()
+
+    @Test fun incognitoResponsesNeverEnterTheHttpCache() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(cacheableConversation())
+            server.enqueue(cacheableConversation())
+            val api = AntonApi(temporaryFolder.newFolder()) { ServerConfig(server.url("/").toString()) }
+            val cache = checkNotNull(api.http.cache)
+            cache.use {
+                repeat(2) { api.incognitoConversation("inco_test") }
+                assertEquals(2, server.requestCount)
+                assertEquals("/api/agents/incognito/inco_test", server.takeRequest().path)
+                assertNull(server.takeRequest().getHeader("If-None-Match"))
+                assertFalse(cache.urls().hasNext())
+                assertEquals(0, cache.hitCount())
+            }
+        }
+    }
+
+    private fun cacheableConversation() = MockResponse().setBody("""{"messages":[]}""")
+        .setHeader("ETag", "W/\"secret-chat\"")
+        .setHeader("Cache-Control", "private, max-age=3600")
+
     @Test fun anUnchangedReadIsAnEmpty304AnsweredFromTheCache() = runBlocking {
         val dir = Files.createTempDirectory("http").toFile()
         val tags = CopyOnWriteArrayList<String?>()
