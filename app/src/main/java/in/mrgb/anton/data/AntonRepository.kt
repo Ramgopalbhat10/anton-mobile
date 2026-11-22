@@ -81,6 +81,8 @@ class AntonRepository(val api: AntonApi, changeEvents: Flow<EventsStream.Event.C
 
     suspend fun joins(id: String) = api.sessionJoins(id)
 
+    suspend fun todos(id: String) = api.sessionTodos(id)
+
     /** The task's file diffs: the unpushed changes, or the whole branch when nothing was pushed. */
     suspend fun sessionDiffs(id: String): List<`in`.mrgb.anton.data.api.FileDiff> {
         val unpushed = api.sessionChanges(id)
