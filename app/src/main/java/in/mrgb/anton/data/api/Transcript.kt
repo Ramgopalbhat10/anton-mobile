@@ -118,28 +118,31 @@ object Transcript {
         m.copy(parts = m.parts.map { if (it.type == "ask" && (it.answer == null || it.answer is JsonNull)) it.copy(answer = JsonPrimitive(reply)) else it })
     }
 
-    /** <thread id="…" title="…" state="…" asks="…">inner</thread> → a thread card part + any residual text. */
+    /** Only complete report envelopes are news; ordinary text and partial streams stay intact. */
     fun threadParts(raw: String): List<PartDto> {
-        val out = mutableListOf<PartDto>()
-        val block = Regex("<thread\\s+([^>]*)>(.*?)</thread>|<thread\\s+([^>]*)/>", RegexOption.DOT_MATCHES_ALL)
+        val wrapper = Regex("^\\s*<thread-reports>([\\s\\S]*)</thread-reports>\\s*$").matchEntire(raw)
+            ?: return listOf(PartDto(type = "text", text = raw))
+        val block = Regex("<thread\\s+([^>]*?)(?:/>|>(.*?)</thread>)", RegexOption.DOT_MATCHES_ALL)
         val attr = Regex("(\\w+)=\"([^\"]*)\"")
-        var rest = raw
-        block.findAll(raw).forEach { m ->
-            val attrs = attr.findAll(m.groupValues[1].ifBlank { m.groupValues[3] }).associate { it.groupValues[1] to it.groupValues[2] }
-            out += PartDto(
-                type = "thread",
-                name = attrs["id"],
-                title = attrs["title"],
-                state = attrs["state"],
-                question = attrs["asks"],
-                text = m.groupValues[2].trim().ifBlank { null },
+        val reports = block.findAll(wrapper.groupValues[1]).map { m ->
+            val attrs = attr.findAll(m.groupValues[1]).associate { it.groupValues[1] to unescapeReport(it.groupValues[2]) }
+            val asks = attrs["asks"]?.trim()?.takeIf { it.isNotEmpty() }
+            val body = unescapeReport(m.groupValues[2]).trim()
+            ThreadReportDto(
+                id = attrs["id"].orEmpty(), title = attrs["title"] ?: "Thread",
+                state = attrs["state"].takeIf { it in setOf("waiting", "working", "queued", "review", "landing", "idle", "resolved") } ?: "idle",
+                text = body.ifBlank { asks.orEmpty() },
+                started = attrs["started"].takeIf { it == "you" || it == "routine" }, pr = attrs["pr"],
+                asks = asks,
             )
-            rest = rest.replace(m.value, "")
-        }
-        rest.replace(Regex("</?thread[a-z-]*[^>]*>"), "").trim().takeIf { it.isNotBlank() }
-            ?.let { out += PartDto(type = "text", text = it) }
-        return out
+        }.toList()
+        // Do not silently discard malformed reports or text between them.
+        if (reports.isEmpty() || block.replace(wrapper.groupValues[1], "").isNotBlank()) return listOf(PartDto(type = "text", text = raw))
+        return listOf(PartDto(type = "thread-reports", reports = reports))
     }
+
+    private fun unescapeReport(value: String) = value.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&amp;", "&")
+
 }
 
 /** A JSON value as a string when it is one (not the literal "null"). */

@@ -43,7 +43,7 @@ class TaskCreationTest {
             assertEquals("chat-task", state.completedId)
             assertEquals("", state.draft.text)
             assertEquals(0, state.draft.attachments.count)
-            assertEquals("chat-task", state.consumeCompleted())
+            assertEquals(Completed("chat-task", incognito = false), state.consumeCompleted())
             assertNull(state.consumeCompleted()) // no stale navigation on recreation/reopening
             assertNull(state.sessionId)
             assertFalse(state.choicesLocked)
@@ -110,7 +110,7 @@ class TaskCreationTest {
         gate.complete(Unit)
         job.join()
         state.start(false, { fail("Success already pending navigation"); SessionDto("duplicate") }, { _, _, _ -> fail("Resend") })
-        assertEquals("created", state.consumeCompleted())
+        assertEquals(Completed("created", incognito = false), state.consumeCompleted())
     }
 
     @Test fun cancelledSendKeepsCreatedTaskForExplicitRetry() = runTest {
@@ -124,7 +124,7 @@ class TaskCreationTest {
         assertEquals("Describe this", state.draft.text)
         assertFalse(state.draft.sending)
         state.start(false, { fail("Must reuse created task"); SessionDto("duplicate") }, { id, _, _ -> assertEquals("created", id) })
-        assertEquals("created", state.consumeCompleted())
+        assertEquals(Completed("created", incognito = false), state.consumeCompleted())
     }
 
     @Test fun closingAndReopeningEditorDoesNotResetRequestDraftOrPendingResult() = runTest {
@@ -139,5 +139,36 @@ class TaskCreationTest {
         assertEquals("Describe this", state.draft.text)
         assertSame(upload, state.draft.attachments.snapshot().images.single())
         assertEquals("created", state.sessionId)
+    }
+
+    @Test fun startOverUnlocksChoicesKeepsDraftAndCreatesAFreshTask() = runTest {
+        val state = state()
+        state.start(false, { SessionDto("created") }, { _, _, _ -> throw IllegalStateException("Offline") })
+        assertTrue(state.choicesLocked)
+        state.startOver()
+        assertNull(state.sessionId)
+        assertNull(state.draft.error)
+        assertFalse(state.choicesLocked)
+        assertEquals("Describe this", state.draft.text)
+        assertSame(upload, state.draft.attachments.snapshot().images.single())
+        state.start(false, { SessionDto("fresh") }, { id, _, _ -> assertEquals("fresh", id) })
+        assertEquals(Completed("fresh", incognito = false), state.consumeCompleted())
+    }
+
+    @Test fun incognitoRetryReusesItsIdAndNavigatesToIncognito() = runTest {
+        val state = state().apply { projectId = TaskCreation.INCOGNITO }
+        var firstId = ""
+        state.startIncognito { id, _, _ ->
+            firstId = id
+            error("Offline")
+        }
+        assertTrue(firstId.startsWith("inco_"))
+        assertNull(state.sessionId)
+        assertNull(state.consumeCompleted())
+        assertEquals("Describe this", state.draft.text)
+
+        state.startIncognito { id, _, _ -> assertEquals(firstId, id) }
+        assertEquals(Completed(firstId, incognito = true), state.consumeCompleted())
+        assertNull(state.consumeCompleted())
     }
 }

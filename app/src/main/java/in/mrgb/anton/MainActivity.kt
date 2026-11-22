@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.mrgb.anton.ui.components.AntonSheet
@@ -43,7 +44,7 @@ private sealed class Screen {
     data object Projects : Screen()
     data object Activity : Screen()
     data object Settings : Screen()
-    data class Thread(val id: String) : Screen()
+    data class Thread(val id: String, val review: Boolean = false) : Screen()
     data class Incognito(val id: String) : Screen()
     data class Project(val id: String) : Screen()
     data class Coordinator(val id: String, val name: String) : Screen()
@@ -119,12 +120,15 @@ private fun App() {
                 error = vm.error.collectAsState().value,
                 onRefresh = vm::refresh,
                 onOpen = { push(Screen.Project(it)) },
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
         is Screen.Project -> {
             val vm = projectsVm(app)
-            LaunchedEffect(s.id) { vm.open(s.id) }
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             ProjectDetailScreen(
                 space = vm.detail.collectAsState().value,
                 threads = vm.threads.collectAsState().value,
@@ -135,10 +139,20 @@ private fun App() {
         }
         is Screen.Coordinator -> {
             val vm = projectsVm(app)
+            LifecycleStartEffect(s.id) {
+                val job = vm.watch(s.id)
+                onStopOrDispose { job.cancel() }
+            }
             CoordinatorScreen(
                 spaceId = s.id,
                 name = s.name,
                 messages = vm.coordinatorMessages.collectAsState().value,
+                threads = vm.threads.collectAsState().value,
+                threadsLoaded = vm.threadsLoaded.collectAsState().value,
+                cardActions = vm.cardActions.collectAsState().value,
+                onStopThread = { vm.stopCoordinatorThread(it) },
+                onReviewThread = { push(Screen.Thread(it, review = true)) },
+                onOpenThread = { push(Screen.Thread(it)) },
                 sending = vm.coordinatorDraft(s.id).sending,
                 draft = vm.coordinatorDraft(s.id),
                 model = vm.coordinatorModel.collectAsState().value ?: "",
@@ -149,6 +163,8 @@ private fun App() {
                 onSend = { text, draft -> vm.sendCoordinator(s.id, text, draft) },
                 onAnswer = { vm.answerCoordinator(s.id, it) },
                 onBack = { back.removeAt(back.lastIndex) },
+                older = vm.coordinatorOlder.collectAsState().value,
+                onLoadOlder = { vm.loadOlderCoordinator(s.id) },
             )
         }
         is Screen.Thread -> {
@@ -162,9 +178,11 @@ private fun App() {
                 reasoning = vm.reasoning.collectAsState().value,
                 sending = vm.draft.sending,
                 draft = vm.draft,
+                initialShowDiffs = s.review,
                 webUrl = "${cfg?.normalized ?: "https://code.mrgb.in"}/agents/${s.id}",
                 joins = vm.joins.collectAsState().value,
                 settlements = vm.settlements.collectAsState().value,
+                todos = vm.todos.collectAsState().value,
                 onBack = { back.removeAt(back.lastIndex) },
                 onSend = vm::send,
                 onAnswer = vm::answer,
@@ -172,6 +190,8 @@ private fun App() {
                 onStop = vm::stop,
                 onModel = vm::setModel,
                 onLoadModels = vm::loadModels,
+                older = vm.older.collectAsState().value,
+                onLoadOlder = { vm.loadOlder() },
             )
         }
         is Screen.Incognito -> {
@@ -199,7 +219,7 @@ private fun App() {
                 sessions = vm.sessions.collectAsState().value,
                 onRefresh = vm::refresh,
                 onOpen = { push(Screen.Thread(it)) },
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
         is Screen.Settings -> {
@@ -215,7 +235,7 @@ private fun App() {
                 onServer = vm::setServer,
                 onToggleNeedsYou = vm::setNeedsYou, onToggleFinished = vm::setFinished,
                 onToggleWorking = vm::setWorking, onTogglePlanFirst = vm::setPlanFirst,
-                tabIndex = tabIndex, onNav = nav,
+                tabIndex = tabIndex, onNav = nav, onNew = { newTask = true },
             )
         }
     }
@@ -241,7 +261,6 @@ private fun App() {
                 onRepo = vm::pickRepo,
                 onPlanFirst = vm::setPlanFirst,
                 onStart = { vm.start() },
-                onDiscard = { vm.discard() },
                 onDismiss = { newTask = false },
             )
         }
@@ -256,8 +275,9 @@ private fun ActivityScreen(
     onOpen: (String) -> Unit,
     tabIndex: Int,
     onNav: (Int) -> Unit,
+    onNew: () -> Unit = {},
 ) {
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar("Activity")
         val recent = sessions.sortedByDescending { it.resolvedAt ?: it.pinnedAt ?: it.createdAt }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -269,7 +289,7 @@ private fun ActivityScreen(
                 }
             }
         }
-        BottomBar(tabIndex, onNav)
+        BottomBar(tabIndex, onNav, onNew)
     }
 }
 

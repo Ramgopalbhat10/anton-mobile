@@ -47,6 +47,7 @@ import `in`.mrgb.anton.data.api.DiffLine
 import `in`.mrgb.anton.data.api.FileDiff
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 
 private val AddBg = Color(0x1F35C88A)
@@ -67,14 +68,14 @@ private fun DiffNums(added: Int, removed: Int, fontSize: androidx.compose.ui.uni
  */
 @Composable
 fun DiffCard(files: List<FileDiff>, onOpen: () -> Unit) {
-    AntonCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onOpen)) {
+    AntonCard(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(
             Modifier.padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Anton.AccentBg).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
+                Modifier.size(24.dp).clip(RoundedCornerShape(Radius.Control)).background(Anton.AccentBg).border(1.dp, Anton.AccentBorder, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Text("±", style = Type.Num.copy(fontSize = 13.sp), color = Anton.AccentHover) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {

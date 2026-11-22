@@ -21,7 +21,7 @@ class AntonApp : Application() {
         super.onCreate()
         store = SettingsStore(this)
         // The API reads config lazily, so Settings edits apply to the next request.
-        val api = AntonApi { runBlocking { store.config.first() } }
+        val api = AntonApi(java.io.File(cacheDir, "http")) { runBlocking { store.config.first() } }
         repository = AntonRepository(api)
         images = `in`.mrgb.anton.ui.components.ImageStore(api)
     }

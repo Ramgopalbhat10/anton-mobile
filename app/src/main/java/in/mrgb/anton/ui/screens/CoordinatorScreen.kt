@@ -1,27 +1,23 @@
 package `in`.mrgb.anton.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import `in`.mrgb.anton.data.api.MessageDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
+import `in`.mrgb.anton.data.api.SessionDto
+import `in`.mrgb.anton.data.api.ThreadCardAction
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
 import `in`.mrgb.anton.ui.theme.Space
-import `in`.mrgb.anton.ui.theme.Type
 
 /** A project's coordinator conversation — the web's coordinator feed, compact. */
 @Composable
@@ -39,39 +35,21 @@ fun CoordinatorScreen(
     onBack: () -> Unit,
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
+    threads: List<SessionDto> = emptyList(),
+    threadsLoaded: Boolean = false,
+    onOpenThread: (String) -> Unit = {},
+    cardActions: Map<String, ThreadCardAction> = emptyMap(),
+    onStopThread: ((String) -> Unit)? = null,
+    onReviewThread: ((String) -> Unit)? = null,
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
 ) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         AppBar(name, subtitle = "Coordinator", onBack = onBack, divider = true)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId)) {
-            LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
-                if (messages.isEmpty()) {
-                    item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
-                }
-                items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
-                    if (m.role == "user") {
-                        m.parts.forEach { p ->
-                            when (p.type) {
-                                "thread" -> ThreadCard(p)
-                                "file" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                    val name = p.title ?: p.path?.substringAfterLast('/') ?: "attachment"
-                                    val viewer = LocalViewer.current
-                                    if (p.mediaType?.startsWith("image/") == true && !p.url.isNullOrBlank()) ImageCard(p.url, name, height = 120.dp, caption = false)
-                                    else FileChip(
-                                        name, p.mediaType,
-                                        onOpen = p.url?.let { u -> { viewer?.invoke(listOf(Artifact(name, u)), 0) } },
-                                    )
-                                }
-                                else -> UserMessage(m.copy(parts = listOf(p)))
-                            }
-                        }
-                    } else AgentMessage(m)
-                }
-            }
+            CompositionLocalProvider(LocalAnswer provides onAnswer, LocalAnswerEnabled provides (!sending && !draft.sending && !draft.attachments.reading), LocalFilePlace provides FilePlace(spaceId = spaceId),
+                LocalCoordinatorCards provides CoordinatorCardHost(cardActions, onStopThread, onReviewThread)) {
+            key(spaceId) { CoordinatorTimeline(messages, threads, threadsLoaded, onOpenThread, older = older, onLoadOlder = onLoadOlder) }
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -91,5 +69,34 @@ fun CoordinatorScreen(
                 )
             }
         }
+    }
+}
+
+/** The coordinator's messages, kept scrolled to the newest one like a thread. */
+@Composable
+internal fun CoordinatorTimeline(
+    messages: List<MessageDto>,
+    threads: List<SessionDto> = emptyList(),
+    threadsLoaded: Boolean = false,
+    onOpenThread: (String) -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
+) {
+    // Follows the newest message as it arrives and is written; earlier turns going in above don't move it.
+    LaunchedEffect(messages.lastOrNull(), messages.isEmpty()) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
+    val keys = remember(messages) { messages.map<MessageDto, Any> { it.id.ifBlank { it.hashCode().toString() } } }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    LazyColumn(state = listState, modifier = Modifier.contentWidth().fillMaxHeight(), contentPadding = PaddingValues(horizontal = Space.Gutter, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(Space.Turn)) {
+        if (messages.isEmpty()) {
+            item { EmptyState(Lucide.Sparkles, "No conversation yet", "Ask the coordinator to plan work or start threads.") }
+        }
+        items(messages, key = { it.id.ifBlank { it.hashCode().toString() } }) { m ->
+            CoordinatorMessage(m, threads, threadsLoaded, onOpenThread)
+        }
+        // Scrolling to this lands at the very end, even below a tall last message.
+        item(key = "coordinator-tail-anchor") { Spacer(Modifier.height(0.dp)) }
+    }
+    EarlierMessages(listState, older, keys, onLoadOlder)
     }
 }

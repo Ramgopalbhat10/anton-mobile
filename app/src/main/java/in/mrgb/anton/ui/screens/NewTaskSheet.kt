@@ -28,6 +28,7 @@ import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Type
 import `in`.mrgb.anton.vm.TaskCreation
 
@@ -48,7 +49,6 @@ fun NewTaskSheet(
     onRepo: (String?) -> Unit,
     onPlanFirst: (Boolean) -> Unit,
     onStart: () -> Unit,
-    onDiscard: () -> Unit,
     onDismiss: () -> Unit,
     state: TaskCreation = remember { TaskCreation() },
 ) {
@@ -59,7 +59,7 @@ fun NewTaskSheet(
     val prompt = state.draft.text
     val model = state.model
     val reasoning = state.reasoning
-    val busy = creating || state.draft.sending || state.discarding
+    val busy = creating || state.draft.sending
     val locked = busy || state.choicesLocked
     var modelMenu by remember { mutableStateOf(false) }
     var addMenu by remember { mutableStateOf(false) }
@@ -75,21 +75,13 @@ fun NewTaskSheet(
     val canStart = (prompt.isNotBlank() || atts.count > 0) && !busy && !atts.reading && !blind
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 16.dp)) {
-        (state.discardError ?: state.draft.error)?.let { ErrorNotice(it, Modifier.padding(bottom = 10.dp)) }
+        state.draft.error?.let { ErrorNotice(it, Modifier.padding(bottom = 10.dp)) }
         if (state.sessionId != null) {
             Text("Task created. Retry sends to the same task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
-            if (state.discardConfirmation) {
-                Text("Delete the created task and its files? Your prompt and attachments will be kept for a new task.", style = Type.Small, color = Anton.TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
-                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AntonButton("Keep task", state::cancelDiscard, Modifier.weight(1f), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = !busy)
-                    AntonButton(if (state.discarding) "Deleting task…" else "Delete task", onDiscard, Modifier.weight(1f), variant = ButtonVariant.Destructive, size = ButtonSize.Sm, enabled = state.canDiscard)
-                }
-            } else {
-                AntonButton("Discard task and start new", state::requestDiscard, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = state.canDiscard)
-            }
+            AntonButton("Start a separate task instead", state::startOver, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.Outline, size = ButtonSize.Sm, enabled = !busy)
         }
-        val shape = RoundedCornerShape(14.dp)
-        Column(Modifier.fillMaxWidth().clip(shape).background(Anton.CardGradient).border(1.dp, border, shape)) {
+        val shape = RoundedCornerShape(Radius.Dialog)
+        Column(Modifier.fillMaxWidth().clip(shape).background(Anton.Surface).border(1.dp, border, shape)) {
             AttachmentTray(atts, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp))
             BasicTextField(
                 value = prompt, onValueChange = state.draft::edit, enabled = !busy,
@@ -182,13 +174,18 @@ fun NewTaskSheet(
                 }
                 if (!incognito) AntonSwitch(planFirst, onPlanFirst, enabled = !locked)
                 Box(
-                    Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+                    Modifier.size(32.dp).clip(RoundedCornerShape(Radius.Control))
                         .background(if (canStart) Anton.Accent else Anton.N750)
                         .clickable(enabled = canStart, role = Role.Button, onClick = onStart),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Lucide.ArrowUp, if (state.discarding) "Deleting task…" else if (creating) "Starting…" else if (state.sessionId != null) "Retry sending" else if (incognito) "Start incognito chat" else "Start task",
+                        Lucide.ArrowUp, when {
+                            creating -> "Starting…"
+                            state.sessionId != null -> "Retry sending"
+                            incognito -> "Start incognito chat"
+                            else -> "Start task"
+                        },
                         tint = if (canStart) Anton.AccentFg else Anton.TextDisabled, modifier = Modifier.size(16.dp),
                     )
                 }

@@ -116,6 +116,7 @@ fun IncognitoScreen(
                 Composer(
                     working = working,
                     sending = sending,
+                    todos = emptyList(),
                     draft = draft,
                     onSend = onSend,
                     onStop = onStop,

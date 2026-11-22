@@ -34,10 +34,12 @@ import `in`.mrgb.anton.data.api.ModelDto
 import `in`.mrgb.anton.data.api.PartDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SettlementDto
+import `in`.mrgb.anton.data.api.TodoDto
 import `in`.mrgb.anton.data.api.placeJoined
 import `in`.mrgb.anton.ui.components.*
 import `in`.mrgb.anton.ui.theme.Anton
 import `in`.mrgb.anton.ui.theme.Lucide
+import `in`.mrgb.anton.ui.theme.Radius
 import `in`.mrgb.anton.ui.theme.Space
 import `in`.mrgb.anton.ui.theme.Type
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,6 +60,7 @@ fun ThreadScreen(
     webUrl: String,
     joins: List<JoinDto> = emptyList(),
     settlements: List<SettlementDto> = emptyList(),
+    todos: List<TodoDto> = emptyList(),
     onBack: () -> Unit,
     onSend: (String, OutgoingDraft) -> Unit,
     onAbort: () -> Unit,
@@ -66,12 +69,15 @@ fun ThreadScreen(
     onLoadModels: () -> Unit,
     draft: MessageDraft = remember { MessageDraft() },
     onAnswer: (String) -> Unit = { onSend(it, OutgoingDraft()) },
+    initialShowDiffs: Boolean = false,
+    older: `in`.mrgb.anton.data.api.ConversationWindow.Older = `in`.mrgb.anton.data.api.ConversationWindow.Older(),
+    onLoadOlder: () -> Unit = {},
 ) {
     val s = bundle?.session
     var menu by remember { mutableStateOf(false) }
-    var showDiffs by remember { mutableStateOf(false) }
+    var showDiffs by remember(initialShowDiffs) { mutableStateOf(initialShowDiffs) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    Column(Modifier.fillMaxSize().background(Anton.Canvas)) {
+    Column(Modifier.fillMaxSize().background(Anton.Panel)) {
         Row(
             Modifier.fillMaxWidth().hairlineBottom().heightIn(min = 56.dp).padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -113,8 +119,9 @@ fun ThreadScreen(
         val answeredBy = remember(settlements) { settlements.associate { it.submissionId to it.answeredBySubmissionId } }
         // Messages sent while the agent worked move into the reply it was writing, where it read them.
         val rows = remember(messages, joins, answeredBy, liveReply) { placeJoined(messages, joins, answeredBy, liveReply) }
-        // Keep the tail of the transcript visible as messages arrive and stream in.
-        val tailSize = rows.size + rows.lastOrNull().let { r -> r?.parts?.sumOf { it.text?.length ?: 0 } ?: 0 }
+        // Keep the tail of the transcript visible as messages arrive and stream in; earlier turns going in above don't move it.
+        val tailSize = rows.lastOrNull().let { r -> Triple(r?.key, r?.parts?.size ?: 0, r?.parts?.sumOf { it.text?.length ?: 0 } ?: 0) }
+        val rowKeys = remember(rows) { rows.map { it.key.ifBlank { it.message.hashCode().toString() } } }
         LaunchedEffect(tailSize) { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             CompositionLocalProvider(
@@ -149,12 +156,14 @@ fun ThreadScreen(
                 }
             }
             }
+            EarlierMessages(listState, older, rowKeys, onLoadOlder)
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.contentWidth()) {
                 Composer(
                     working = s?.working == true,
                     sending = sending,
+                    todos = todos,
                     draft = draft,
                     onSend = onSend,
                     onStop = onAbort,
@@ -209,7 +218,7 @@ internal fun mdType(small: Boolean = false): com.mikepenz.markdown.model.Markdow
 
 @Composable
 fun UserMessage(m: MessageDto) {
-    val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
+    val shape = RoundedCornerShape(12.dp, 12.dp, 4.dp, 12.dp)
     // Attached files show as chips; the text they carry is the agent's to read.
     val split = Attachments.split(m.parts.filter { it.type == "text" }.joinToString("") { it.text.orEmpty() })
     val images = Attachments.inlineImages(m.parts, split.files)
@@ -318,7 +327,7 @@ private fun PrCard(pr: kotlinx.serialization.json.JsonObject, s: `in`.mrgb.anton
     AntonCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(7.dp)),
+                Modifier.size(24.dp).clip(RoundedCornerShape(Radius.Control)).background(Anton.SuccessBg).border(1.dp, Anton.SuccessBorder, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Icon(Lucide.GitPullRequest, null, tint = Anton.Success, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -372,7 +381,7 @@ private fun AskCard(p: PartDto) {
     AntonCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 12.dp, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(7.dp)),
+                Modifier.size(22.dp).clip(RoundedCornerShape(Radius.Control)).border(1.dp, Anton.AccentBorder, RoundedCornerShape(Radius.Control)),
                 contentAlignment = Alignment.Center,
             ) { Icon(Lucide.MessageCircleQuestion, null, tint = Anton.Accent, modifier = Modifier.size(14.dp)) }
             Column(Modifier.weight(1f)) {
@@ -387,7 +396,7 @@ private fun AskCard(p: PartDto) {
             Column(Modifier.padding(horizontal = 10.dp).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 p.options.forEachIndexed { i, opt ->
                     val on = i == picked
-                    val shape = RoundedCornerShape(9.dp)
+                    val shape = RoundedCornerShape(Radius.Card)
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(shape)
                             .background(if (on) Anton.AccentBg else Color.Transparent)
@@ -429,7 +438,7 @@ private fun AskCard(p: PartDto) {
 @Composable
 private fun QueuedNote(text: String) {
     Column(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val shape = RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp)
+        val shape = RoundedCornerShape(12.dp, 12.dp, 4.dp, 12.dp)
         Box(
             Modifier.clip(shape).border(1.dp, Anton.BorderDefault, shape).padding(horizontal = 15.dp, vertical = 11.dp),
         ) { Text(text, style = Type.Body.copy(lineHeight = 21.sp), color = Anton.TextTertiary, maxLines = 4, overflow = TextOverflow.Ellipsis) }
@@ -443,6 +452,7 @@ private fun QueuedNote(text: String) {
 @Composable
 internal fun Composer(
     working: Boolean, sending: Boolean,
+    todos: List<TodoDto>,
     onSend: (String, OutgoingDraft) -> Unit, onStop: () -> Unit,
     model: String, reasoning: String?, models: List<ModelDto>,
     onModel: (String, String?) -> Unit, onLoadModels: () -> Unit,
@@ -451,6 +461,7 @@ internal fun Composer(
 ) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.contentWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 12.dp)) {
+        TodoPill(todos, working, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
         AntonComposer(
             placeholder = if (working) "Add to what the agent is doing" else idlePlaceholder,
             working = working, sending = sending,

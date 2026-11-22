@@ -112,12 +112,7 @@ internal class TaskAttachmentScenes(private val paparazzi: Paparazzi) {
         }
     }
 
-    fun retryNewTaskDraft() = newTaskRecovery(0)
-    fun confirmDiscardTask() = newTaskRecovery(1)
-    fun discardCleanupFailure() = newTaskRecovery(2)
-    fun newTaskAfterDiscard() = newTaskRecovery(3)
-
-    private fun newTaskRecovery(stage: Int) = runBlocking {
+    fun retryNewTaskDraft() = runBlocking {
         TaskAttachmentServer().use { server ->
             val state = TaskCreation().apply {
                 initialize(null, null)
@@ -128,15 +123,10 @@ internal class TaskAttachmentScenes(private val paparazzi: Paparazzi) {
             state.start(false, server.api::createSession, server.repo::send)
             assertNotNull(state.sessionId)
             assertNull(state.completedId)
-            if (stage > 0) state.requestDiscard()
-            if (stage >= 2) {
-                server.deleteStatus = if (stage == 2) 503 else 204
-                assertEquals(stage == 3, state.discard(server.api::deleteSession))
-            }
             paparazzi.snapshot {
                 Box(Modifier.fillMaxSize().background(Anton.Canvas)) {
                     NewTaskSheet(repos = emptyList(), branches = emptyList(), defaultBranch = null, models = emptyList(),
-                        planFirst = false, creating = false, onRepo = {}, onPlanFirst = {}, onStart = {}, onDiscard = {}, onDismiss = {}, state = state)
+                        planFirst = false, creating = false, onRepo = {}, onPlanFirst = {}, onStart = {}, onDismiss = {}, state = state)
                 }
             }
         }

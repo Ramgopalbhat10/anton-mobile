@@ -130,6 +130,17 @@ data class JoinDto(
 @Serializable
 data class JoinsResponse(val joins: List<JoinDto> = emptyList())
 
+/** One step of the agent's todo list (src/services/replies/todos.ts); [status] is pending, in_progress or completed. */
+@Serializable
+data class TodoDto(val content: String = "", val status: String = "pending", val evidence: String? = null)
+
+@Serializable
+data class TodoListDto(val todos: List<TodoDto> = emptyList(), val updatedAt: String = "")
+
+/** GET /api/sessions/:id/todos: null until the agent writes a list. */
+@Serializable
+data class TodosResponse(val list: TodoListDto? = null)
+
 /** The raw conversation: messages plus the settlements that say which reply answered each submission. */
 data class ConversationDto(
     val messages: List<MessageDto> = emptyList(),
@@ -149,6 +160,8 @@ data class PartDto(
     val recommended: JsonElement? = null,
     val answer: JsonElement? = null,
     val hint: String? = null,
+    /** Coordinator news: preserve the report batch and each thread's creation origin. */
+    val reports: List<ThreadReportDto> = emptyList(),
     /** Tool calls: what was called with, what came back, and how it failed. */
     val input: JsonElement? = null,
     val output: JsonElement? = null,
@@ -261,3 +274,17 @@ data class CreateSessionRequest(
 
 @Serializable
 data class AgentMessageRequest(val message: String)
+
+@Serializable
+data class ThreadReportDto(
+    val id: String = "",
+    val title: String = "Thread",
+    val state: String = "idle",
+    val text: String = "",
+    val started: String? = null,
+    val pr: String? = null,
+    /** The historical question can accompany a separate report body. */
+    val asks: String? = null,
+)
+
+data class ThreadCardAction(val pending: Boolean = false, val error: String? = null)

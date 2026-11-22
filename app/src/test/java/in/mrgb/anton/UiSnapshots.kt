@@ -26,6 +26,7 @@ import `in`.mrgb.anton.data.api.PullRequestDto
 import `in`.mrgb.anton.data.api.SessionBundleDto
 import `in`.mrgb.anton.data.api.SessionDto
 import `in`.mrgb.anton.data.api.SpaceDto
+import `in`.mrgb.anton.data.api.TodoDto
 import `in`.mrgb.anton.ui.components.AntonComposer
 import `in`.mrgb.anton.ui.components.Badge
 import `in`.mrgb.anton.ui.components.Artifact
@@ -36,6 +37,8 @@ import `in`.mrgb.anton.ui.components.FileChip
 import `in`.mrgb.anton.ui.components.SectionLabel
 import `in`.mrgb.anton.ui.components.SelectChip
 import `in`.mrgb.anton.ui.components.Tone
+import `in`.mrgb.anton.ui.components.TodoPanel
+import `in`.mrgb.anton.ui.components.TodoPill
 import `in`.mrgb.anton.ui.components.contentWidth
 import `in`.mrgb.anton.ui.screens.AgentMessage
 import `in`.mrgb.anton.ui.screens.BottomBar
@@ -109,6 +112,8 @@ private val models = listOf(
     ModelDto("deepseek/deepseek-v4.1-pro", "DeepSeek V4.1 Pro", "deepseek", "deepseek", contextLength = 128_000),
     ModelDto("xai/grok-4.7", "Grok 4.7", "xai", "xai", contextLength = 500_000),
     ModelDto("openai/gpt-6.1-sol", "GPT-6.1 Sol", "openai", "openai", contextLength = 400_000),
+    ModelDto("devin/swe-2", "SWE-2", "devin", "Devin", contextLength = 262_000, subscription = "Devin"),
+    ModelDto("antigravity/gemini-4-neon", "Gemini 4 Neon", "antigravity", "Antigravity", contextLength = 1_048_576, subscription = "Antigravity"),
 )
 
 private val threadMessages = listOf(
@@ -126,6 +131,14 @@ private val threadMessages = listOf(
     ),
     MessageDto("u2", "user", parts = listOf(PartDto(type = "thread", title = "Improve projects screen", state = "idle", text = "Fixed the filename collision and updated **PR #134**."))),
     MessageDto("a2", "assistant", parts = listOf(PartDto(type = "text", text = "The [expense tracker](#thread-61f554e3) is ready, with a dashboard, budget tracking, and CSV export."))),
+)
+
+private val todoList = listOf(
+    TodoDto("Inspect remaining migrations, types, UI primitives, icons, and existing project tests", "completed", "Read migrations.ts, signal/instrument primitives, icons.tsx, design-tokens.test.tsx, spaces.test.ts, and projects.test.tsx"),
+    TodoDto("Add DB migration and src/db/space-todos.ts with space/thread deletion cleanup", "completed", "Added migration #46 in src/db/migrations.ts, src/db/space-todos.ts, and src/core/space-todos.ts with cascade cleanup when a space or a thread is deleted, checked by npm test"),
+    TodoDto("Implement src/services/projects/todos.ts (CRUD, reorder, assign) and wire into spaces.ts", "in_progress"),
+    TodoDto("Integrate To-dos into Coordinator (project-state, create_todo/update_todo tools)", "pending"),
+    TodoDto("Add /api/spaces/:id/todos routes and web API, React Query hooks, live updates", "pending"),
 )
 
 private val diffFiles = listOf(
@@ -214,15 +227,6 @@ class UiSnapshots {
     fun extensionlessImageViewer() = TaskAttachmentScenes(paparazzi).extensionlessImageViewer()
 
     @Test
-    fun confirmDiscardTask() = TaskAttachmentScenes(paparazzi).confirmDiscardTask()
-
-    @Test
-    fun discardCleanupFailure() = TaskAttachmentScenes(paparazzi).discardCleanupFailure()
-
-    @Test
-    fun newTaskAfterDiscard() = TaskAttachmentScenes(paparazzi).newTaskAfterDiscard()
-
-    @Test
     fun tasksScreen() = snap {
         TasksScreen(
             sessions = tasks, tab = TasksTab.All, query = "",
@@ -257,12 +261,36 @@ class UiSnapshots {
     fun coordinatorView() = snap {
         CoordinatorScreen(
             spaceId = "space_b", name = "mrgb",
-            messages = threadMessages,
+            messages = coordinatorFixture(),
+            threads = coordinatorThreads,
+            threadsLoaded = true,
+            onReviewThread = {},
             sending = false, model = "openai/gpt-6.1-terra[fast]", reasoning = null,
             models = models,
             onModel = { _, _ -> }, onLoadModels = {}, onSend = { _, _ -> }, onBack = {},
         )
     }
+
+    @Test
+    fun coordinatorEntries() = CoordinatorScenes(paparazzi).entries()
+
+    @Test
+    fun coordinatorInteractions() = CoordinatorScenes(paparazzi).interactions()
+
+    @Test
+    fun coordinatorLargeText() = CoordinatorScenes(paparazzi).largeText()
+
+    @Test
+    fun coordinatorCreationCard() = CoordinatorCreationScenes(paparazzi).card()
+
+    @Test
+    fun coordinatorCreationStates() = CoordinatorCreationScenes(paparazzi).states()
+
+    @Test
+    fun coordinatorReportQuestionAndBody() = CoordinatorScenes(paparazzi).questionAndBody()
+
+    @Test
+    fun coordinatorReportQuestionLargeText() = CoordinatorScenes(paparazzi).questionAndBody(large = true)
 
     @Test
     fun threadView() = snap {
@@ -309,6 +337,33 @@ class UiSnapshots {
     }
 
     @Test
+    fun threadTodos() = snap {
+        ThreadScreen(
+            bundle = SessionBundleDto(session = tasks[2].copy(working = true, threadState = "working")),
+            messages = threadMessages,
+            diffs = emptyList(),
+            models = models, reasoning = null, sending = false,
+            webUrl = "https://code.mrgb.in",
+            todos = todoList,
+            onBack = {}, onSend = { _, _ -> }, onAbort = {}, onStop = {},
+            onModel = { _, _ -> }, onLoadModels = {},
+        )
+    }
+
+    @Test
+    fun todoPanel() = snap {
+        Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            TodoPanel(todoList, working = true)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
+            TodoPill(todoList, working = true)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 18.dp))
+            TodoPanel(todoList.take(3).map { it.copy(status = if (it.status == "pending") "in_progress" else it.status) }, working = false)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
+            TodoPill(todoList.map { it.copy(status = "completed") }, working = false)
+        }
+    }
+
+    @Test
     fun askAndSteps() = snap {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.contentWidth().padding(12.dp)) {
@@ -344,7 +399,7 @@ class UiSnapshots {
             branches = listOf("main", "devin/mobile", "anton/feature-flags"),
             defaultBranch = "main",
             models = models, planFirst = true, creating = false,
-            onRepo = {}, onPlanFirst = {}, onStart = {}, onDiscard = {}, onDismiss = {},
+            onRepo = {}, onPlanFirst = {}, onStart = {}, onDismiss = {},
         )
     }
 

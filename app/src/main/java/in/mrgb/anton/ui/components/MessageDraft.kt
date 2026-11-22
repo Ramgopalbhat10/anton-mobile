@@ -3,7 +3,9 @@ package `in`.mrgb.anton.ui.components
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import `in`.mrgb.anton.data.api.AttachedFileDto
 import `in`.mrgb.anton.data.api.OutgoingDraft
+import `in`.mrgb.anton.data.api.PendingUpload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 
@@ -14,6 +16,8 @@ class MessageDraft(internal val readScope: CoroutineScope? = null) {
     var error by mutableStateOf<String?>(null); private set
     var text by mutableStateOf("")
         private set
+    /** Files already saved for this draft, so retrying a failed send doesn't save them again. */
+    val uploads = mutableMapOf<PendingUpload, AttachedFileDto>()
 
     fun edit(value: String) { if (!sending && !attachments.locked) text = value }
 
@@ -40,6 +44,7 @@ class MessageDraft(internal val readScope: CoroutineScope? = null) {
             if (ownsDraft) {
                 this.text = ""
                 attachments.clear()
+                uploads.clear()
             }
             return true
         } catch (e: CancellationException) {
